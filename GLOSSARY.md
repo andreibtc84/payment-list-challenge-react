@@ -15,3 +15,7 @@
 - **pending**: the payment has not yet settled.
 - **failed**: the payment did not succeed.
 - **refunded**: the payment succeeded and was later returned to the Customer.
+
+**Applied search**: The Payment ID search currently driving the table. It lives in the URL as `?search=`, trimmed, and is absent when there is no search.
+
+**Draft**: The text currently typed in the search box. It becomes the Applied search only when Search is pressed (or Enter), and it follows the Applied search on page load and Back/Forward.

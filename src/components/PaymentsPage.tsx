@@ -1,6 +1,8 @@
 import { DEFAULT_PAGE, PAGE_SIZE } from '../constants'
 import { I18N } from '../constants/i18n'
+import { usePaymentFilters } from '../hooks/usePaymentFilters'
 import { usePayments } from '../hooks/usePayments'
+import { SearchForm } from './SearchForm'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
@@ -47,9 +49,12 @@ const PaymentsTableHeader = () => (
 )
 
 export const PaymentsPage = () => {
-  const { data, isPending } = usePayments({
+  const [filters, setFilters] = usePaymentFilters()
+  // An empty search sends no param, so the query key matches the unfiltered list.
+  const { data, isPending, isPlaceholderData } = usePayments({
     page: DEFAULT_PAGE,
     pageSize: PAGE_SIZE,
+    ...(filters.search && { search: filters.search }),
   })
 
   return (
@@ -57,9 +62,14 @@ export const PaymentsPage = () => {
       <h2 id={HEADING_ID} className='mb-6 text-2xl font-semibold text-gray-800'>
         {I18N.PAGE_TITLE}
       </h2>
+      <SearchForm
+        term={filters.search}
+        onSearch={(search) => setFilters({ search })}
+      />
       {/* Always rendered: a live region must exist before its text changes to be announced. */}
       <div role='status' aria-live='polite' className='sr-only'>
-        {isPending ? I18N.LOADING_PAYMENTS : ''}
+        {/* Not isFetching: that would also announce silent background refetches. */}
+        {isPending || isPlaceholderData ? I18N.LOADING_PAYMENTS : ''}
       </div>
       <div className='rounded-lg border bg-white'>
         {isPending ? (
@@ -80,8 +90,15 @@ export const PaymentsPage = () => {
           </Table>
         ) : (
           // Focusable, named scroll region, so keyboard users can scroll the table on narrow screens.
+          // Previous rows stay while a search loads: dimmed and busy so they read as stale.
           <Table
             aria-labelledby={HEADING_ID}
+            aria-busy={isPlaceholderData || undefined}
+            className={
+              isPlaceholderData
+                ? 'opacity-90 transition-opacity motion-reduce:transition-none'
+                : undefined
+            }
             containerProps={{
               role: 'region',
               'aria-labelledby': HEADING_ID,
