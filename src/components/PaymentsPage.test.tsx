@@ -1,9 +1,11 @@
-import { render, screen, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { http, HttpResponse } from 'msw'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { API_URL } from '../constants'
 import { I18N } from '../constants/i18n'
+import { mockPayments134 } from '../mocks/mockPaymentsData'
 import { server } from '../mocks/node'
 import type { Payment, PaymentStatus } from '../types/payment'
 import { PaymentsPage } from './PaymentsPage'
@@ -71,8 +73,64 @@ const getDataRow = (index: number) =>
     ]),
   )
 
+type User = ReturnType<typeof userEvent.setup>
+
+// The two ways to submit a search; shared so every submit test covers both the same way.
+const SUBMIT_WAYS: [string, (user: User) => Promise<void>][] = [
+  [
+    'clicking Search',
+    (user) => user.click(getSearchButton()),
+  ],
+  ['pressing Enter', (user) => user.keyboard('{Enter}')],
+]
+
+const getSearchbox = () =>
+  screen.getByRole<HTMLInputElement>('searchbox', { name: 'Search payments' })
+
+const getSearchButton = () => screen.getByRole('button', { name: 'Search' })
+
+// Collects the URL of every payments request from now on (listeners are removed in afterEach).
+const captureRequests = () => {
+  const urls: URL[] = []
+  server.events.on('request:start', ({ request }) => {
+    urls.push(new URL(request.url))
+  })
+  return urls
+}
+
+// Header row + one Payment: the state after a search for one Payment ID has loaded.
+const waitForSingleResult = () =>
+  waitFor(() => expect(screen.getAllByRole('row')).toHaveLength(2))
+
+// Single release path for the held response; afterEach calls it too, so a test that fails
+// before releasing leaves no pending response.
+let releaseHeldSearch = () => {}
+
+// Holds the response of the next payments request until releaseHeldSearch() is called.
+const holdNextSearch = () => {
+  const gate = new Promise<void>((resolve) => {
+    releaseHeldSearch = resolve
+  })
+  server.use(
+    http.get(
+      `*${API_URL}`,
+      async () => {
+        await gate
+        return HttpResponse.json({
+          payments: [mockPayments134[0]],
+          total: 1,
+          page: 1,
+          pageSize: 5,
+        })
+      },
+      { once: true },
+    ),
+  )
+}
+
 beforeAll(() => server.listen())
 afterEach(() => {
+  releaseHeldSearch()
   server.resetHandlers()
   server.events.removeAllListeners()
 })
@@ -113,10 +171,7 @@ describe('PaymentsPage payment list', () => {
   })
 
   it('should request the first page of 5 payments and show 5 rows', async () => {
-    const requestedUrls: URL[] = []
-    server.events.on('request:start', ({ request }) => {
-      requestedUrls.push(new URL(request.url))
-    })
+    const requestedUrls = captureRequests()
     await renderLoadedPage()
 
     expect(screen.getAllByRole('row')).toHaveLength(6) // 1 header + 5 payments
@@ -184,4 +239,241 @@ describe('PaymentsPage payment list', () => {
       within(region).getByRole('table', { name: 'All payments' }),
     ).toBeTruthy()
   })
+})
+
+describe('PaymentsPage search', () => {
+  it('should show a searchbox for the Payment ID inside a search landmark', async () => {
+    await renderLoadedPage()
+
+    const searchbox = within(screen.getByRole('search')).getByRole('searchbox', {
+      name: 'Search payments',
+    })
+    expect(searchbox.getAttribute('placeholder')).toBe('Enter payment ID')
+  })
+
+  it('should show a Search button inside the search landmark', async () => {
+    await renderLoadedPage()
+
+    expect(
+      within(screen.getByRole('search')).getByRole('button', { name: 'Search' }),
+    ).toBeTruthy()
+  })
+
+  it.each(SUBMIT_WAYS)(
+    'should send the Payment ID search with page 1 and page size 5 and show only that Payment when %s',
+    async (_how, submit) => {
+      const user = userEvent.setup()
+      const requestedUrls = captureRequests()
+      await renderLoadedPage()
+      requestedUrls.length = 0
+
+      await user.type(getSearchbox(), 'pay_134_1')
+      await submit(user)
+
+      // Waits for the filtered result: 1 header + 1 payment.
+      await waitForSingleResult()
+      expect(getDataRow(0)['Payment ID']).toBe('pay_134_1')
+      expect(requestedUrls).toHaveLength(1)
+      expect(requestedUrls[0].searchParams.get('search')).toBe('pay_134_1')
+      expect(requestedUrls[0].searchParams.get('page')).toBe('1')
+      expect(requestedUrls[0].searchParams.get('pageSize')).toBe('5')
+    },
+  )
+
+  it('should keep the term in the input after searching', async () => {
+    const user = userEvent.setup()
+    await renderLoadedPage()
+    const searchbox = getSearchbox()
+
+    await user.type(searchbox, 'pay_134_1')
+    await user.click(getSearchButton())
+    await waitForSingleResult()
+
+    expect(searchbox.value).toBe('pay_134_1')
+  })
+
+  it('should put the search in the URL after searching', async () => {
+    const user = userEvent.setup()
+    await renderLoadedPage()
+
+    await user.type(getSearchbox(), 'pay_134_1')
+    await user.click(getSearchButton())
+    // Waits for the filtered result, so no request is still in flight when the test ends.
+    await waitForSingleResult()
+
+    expect(window.location.search).toBe('?search=pay_134_1')
+  })
+
+  it('should keep the current rows on screen while a search loads', async () => {
+    const user = userEvent.setup()
+    await renderLoadedPage()
+    holdNextSearch()
+
+    await user.type(getSearchbox(), 'pay_134_1')
+    await user.click(getSearchButton())
+
+    // The search request is held, so this is the in-between state.
+    expect(screen.getAllByRole('row')).toHaveLength(6) // 1 header + 5 original payments
+    releaseHeldSearch()
+    await waitForSingleResult()
+  })
+
+  it('should mark the table busy and announce loading while a search loads', async () => {
+    const user = userEvent.setup()
+    await renderLoadedPage()
+    const status = screen.getByRole('status')
+    holdNextSearch()
+
+    await user.type(getSearchbox(), 'pay_134_1')
+    await user.click(getSearchButton())
+
+    expect(status.textContent).toBe('Loading payments…')
+    expect(
+      screen.getByRole('table', { name: 'All payments' }).getAttribute('aria-busy'),
+    ).toBe('true')
+
+    releaseHeldSearch()
+    await waitFor(() => expect(status.textContent).toBe(''))
+    expect(
+      screen.getByRole('table', { name: 'All payments' }).getAttribute('aria-busy'),
+    ).toBeNull()
+  })
+
+  it('should trim the term before sending the Payment ID search', async () => {
+    const user = userEvent.setup()
+    const requestedUrls = captureRequests()
+    await renderLoadedPage()
+    requestedUrls.length = 0
+
+    await user.type(getSearchbox(), '  pay_134_1  ')
+    await user.click(getSearchButton())
+    await waitForSingleResult()
+
+    expect(requestedUrls).toHaveLength(1)
+    expect(requestedUrls[0].searchParams.get('search')).toBe('pay_134_1')
+  })
+
+  it.each(['', '   '])(
+    'should mark Search aria-disabled and send no request when the input is %j',
+    async (typed) => {
+      const user = userEvent.setup()
+      const requestedUrls = captureRequests()
+      await renderLoadedPage()
+      requestedUrls.length = 0
+      const historyLength = window.history.length
+
+      if (typed) await user.type(getSearchbox(), typed)
+      const button = getSearchButton()
+      await user.click(button)
+      await user.type(getSearchbox(), '{Enter}')
+
+      expect(button.getAttribute('aria-disabled')).toBe('true')
+      expect(requestedUrls).toHaveLength(0)
+      expect(window.history.length).toBe(historyLength)
+    },
+  )
+
+  it('should let keyboard users Tab to the Search button while it is aria-disabled', async () => {
+    const user = userEvent.setup()
+    await renderLoadedPage()
+
+    await user.click(getSearchbox())
+    await user.tab()
+
+    // Natively disabled buttons drop out of the Tab order; aria-disabled must not.
+    const button = getSearchButton()
+    expect(document.activeElement).toBe(button)
+    expect(button.getAttribute('aria-disabled')).toBe('true')
+  })
+
+  it.each(['?search=pay_134_1', '?search=%20pay_134_1%20'])(
+    'should load with the search applied in the input and the table when the URL starts with %s',
+    async (query) => {
+      const requestedUrls = captureRequests()
+      window.history.replaceState(null, '', `/${query}`)
+
+      renderPage()
+
+      await screen.findByRole('cell', { name: 'pay_134_1' })
+      expect(screen.getAllByRole('row')).toHaveLength(2)
+      expect(getSearchbox().value).toBe('pay_134_1')
+      expect(requestedUrls).toHaveLength(1)
+      expect(requestedUrls[0].searchParams.get('search')).toBe('pay_134_1')
+    },
+  )
+
+  it('should go back to all payments on Back after a search and return to the search on Forward', async () => {
+    const user = userEvent.setup()
+    await renderLoadedPage()
+    await user.type(getSearchbox(), 'pay_134_1')
+    await user.click(getSearchButton())
+    await waitForSingleResult()
+
+    act(() => window.history.back())
+
+    // popstate is async in jsdom, and the previous rows can linger until the list reloads.
+    await waitFor(() => expect(screen.getAllByRole('row')).toHaveLength(6))
+    expect(getSearchbox().value).toBe('')
+
+    act(() => window.history.forward())
+
+    await waitForSingleResult()
+    expect(getDataRow(0)['Payment ID']).toBe('pay_134_1')
+    expect(getSearchbox().value).toBe('pay_134_1')
+  })
+
+  it.each<[string, (user: User) => Promise<void>, () => HTMLElement]>([
+    [
+      'the Search button after clicking it',
+      (user) => user.click(getSearchButton()),
+      () => getSearchButton(),
+    ],
+    [
+      'the searchbox after pressing Enter',
+      (user) => user.keyboard('{Enter}'),
+      getSearchbox,
+    ],
+  ])('should keep focus on %s', async (_how, submit, getControl) => {
+    const user = userEvent.setup()
+    await renderLoadedPage()
+    await user.type(getSearchbox(), 'pay_134_1')
+
+    await submit(user)
+    await waitForSingleResult()
+
+    expect(document.activeElement).toBe(getControl())
+  })
+
+  it('should not add a history entry when searching the applied term again', async () => {
+    const user = userEvent.setup()
+    await renderLoadedPage()
+    await user.type(getSearchbox(), 'pay_134_1')
+    await user.click(getSearchButton())
+    await waitForSingleResult()
+    const historyLength = window.history.length
+
+    await user.click(getSearchButton())
+
+    expect(window.history.length).toBe(historyLength)
+    expect(window.location.search).toBe('?search=pay_134_1')
+  })
+
+  it.each(SUBMIT_WAYS)(
+    'should keep the applied search when the box is cleared and submitted by %s',
+    async (_how, submit) => {
+      const user = userEvent.setup()
+      window.history.replaceState(null, '', '/?search=pay_134_1')
+      renderPage()
+      await screen.findByRole('cell', { name: 'pay_134_1' })
+      const historyLength = window.history.length
+
+      await user.clear(getSearchbox())
+      await submit(user)
+
+      expect(window.location.search).toBe('?search=pay_134_1')
+      expect(window.history.length).toBe(historyLength)
+      expect(screen.getAllByRole('row')).toHaveLength(2)
+      expect(getDataRow(0)['Payment ID']).toBe('pay_134_1')
+    },
+  )
 })
