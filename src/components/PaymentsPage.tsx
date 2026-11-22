@@ -1,6 +1,128 @@
-import React from "react";
-import { Container } from './components'
+import { DEFAULT_PAGE, PAGE_SIZE } from '../constants'
+import { I18N } from '../constants/i18n'
+import { usePayments } from '../hooks/usePayments'
+import { Badge } from '@/components/ui/badge'
+import { Skeleton } from '@/components/ui/skeleton'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import { formatAmount, formatDate, isValidDate } from '@/lib/format'
+
+const COLUMN_HEADERS = [
+  I18N.TABLE_HEADER_PAYMENT_ID,
+  I18N.TABLE_HEADER_DATE,
+  I18N.TABLE_HEADER_AMOUNT,
+  I18N.TABLE_HEADER_CUSTOMER,
+  I18N.TABLE_HEADER_CURRENCY,
+  I18N.TABLE_HEADER_STATUS,
+]
+
+// The visible h2 names the table (aria-labelledby). A static id is safe: the page renders once.
+const HEADING_ID = 'payments-heading'
+
+// Shared by skeleton and real rows, so both keep the same spacing.
+const CELL_CLASS = 'px-4 py-4'
+const TEXT_CELL_CLASS = `${CELL_CLASS} text-muted-foreground`
+// No dividers between body rows, as in the screenshot.
+const BODY_ROW_CLASS = 'border-0'
+
+// Shared by the skeleton and the real table, so their columns can't drift apart.
+const PaymentsTableHeader = () => (
+  <TableHeader className='bg-muted'>
+    {/* No hover tint on the header, as in the screenshot. */}
+    <TableRow className='hover:bg-transparent'>
+      {COLUMN_HEADERS.map((header) => (
+        // Darker than shadcn's default, to match the screenshot.
+        <TableHead key={header} className='px-4 text-gray-800'>
+          {header}
+        </TableHead>
+      ))}
+    </TableRow>
+  </TableHeader>
+)
 
 export const PaymentsPage = () => {
-  return <Container>Start here</Container>;
-};
+  const { data, isPending } = usePayments({
+    page: DEFAULT_PAGE,
+    pageSize: PAGE_SIZE,
+  })
+
+  return (
+    <div className='px-4 py-8 sm:px-0'>
+      <h2 id={HEADING_ID} className='mb-6 text-2xl font-semibold text-gray-800'>
+        {I18N.PAGE_TITLE}
+      </h2>
+      {/* Always rendered: a live region must exist before its text changes to be announced. */}
+      <div role='status' aria-live='polite' className='sr-only'>
+        {isPending ? I18N.LOADING_PAYMENTS : ''}
+      </div>
+      <div className='rounded-lg border bg-white'>
+        {isPending ? (
+          // Hidden from screen readers, which get the status above; no pulse with reduced motion.
+          <Table aria-hidden='true'>
+            <PaymentsTableHeader />
+            <TableBody>
+              {Array.from({ length: PAGE_SIZE }, (_, rowIndex) => (
+                <TableRow key={rowIndex} className={BODY_ROW_CLASS}>
+                  {COLUMN_HEADERS.map((header) => (
+                    <TableCell key={header} className={CELL_CLASS}>
+                      <Skeleton className='h-4 w-full motion-reduce:animate-none' />
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        ) : (
+          // Focusable, named scroll region, so keyboard users can scroll the table on narrow screens.
+          <Table
+            aria-labelledby={HEADING_ID}
+            containerProps={{
+              role: 'region',
+              'aria-labelledby': HEADING_ID,
+              tabIndex: 0,
+              className:
+                'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900',
+            }}
+          >
+            <PaymentsTableHeader />
+            <TableBody>
+              {data?.payments.map((payment) => (
+                <TableRow key={payment.id} className={BODY_ROW_CLASS}>
+                  <TableCell className={TEXT_CELL_CLASS}>{payment.id}</TableCell>
+                  {/* <time> keeps the exact UTC value; an invalid datetime attribute would be invalid HTML. */}
+                  <TableCell className={TEXT_CELL_CLASS}>
+                    {isValidDate(payment.date) ? (
+                      <time dateTime={payment.date}>
+                        {formatDate(payment.date)}
+                      </time>
+                    ) : (
+                      payment.date
+                    )}
+                  </TableCell>
+                  <TableCell className={TEXT_CELL_CLASS}>
+                    {formatAmount(payment.amount)}
+                  </TableCell>
+                  <TableCell className={TEXT_CELL_CLASS}>
+                    {payment.customerName}
+                  </TableCell>
+                  <TableCell className={TEXT_CELL_CLASS}>
+                    {payment.currency}
+                  </TableCell>
+                  <TableCell className={CELL_CLASS}>
+                    <Badge variant={payment.status}>{payment.status}</Badge>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </div>
+    </div>
+  )
+}

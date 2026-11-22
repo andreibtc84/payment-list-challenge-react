@@ -31,6 +31,7 @@ export const I18N = {
   PAGE_LABEL: "Page",
   
   // Messages
+  LOADING_PAYMENTS: "Loading payments…",
   NO_PAYMENTS_FOUND: "No payments found.",
   PAYMENT_NOT_FOUND: "Payment not found.",
   INTERNAL_SERVER_ERROR: "Internal server error. Please try again later.",
