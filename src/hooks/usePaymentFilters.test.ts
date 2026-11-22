@@ -54,6 +54,16 @@ describe('usePaymentFilters', () => {
     expect(result.current[0].search).toBe('')
   })
 
+  it('should add a history entry when the Payment ID search is cleared', () => {
+    window.history.replaceState(null, '', '/?search=pay_134_1')
+    const { result } = renderHook(() => usePaymentFilters())
+    const entries = window.history.length
+
+    act(() => result.current[1]({ search: '' }))
+
+    expect(window.history.length).toBe(entries + 1)
+  })
+
   it('should not add a history entry when the Payment ID search is already applied', () => {
     window.history.replaceState(null, '', '/?search=pay_134_1')
     const { result } = renderHook(() => usePaymentFilters())

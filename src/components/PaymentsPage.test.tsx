@@ -102,6 +102,10 @@ const captureRequests = () => {
 const waitForSingleResult = () =>
   waitFor(() => expect(screen.getAllByRole('row')).toHaveLength(2))
 
+// Waits for the unfiltered first page: 1 header row + 5 payments.
+const waitForFirstPage = () =>
+  waitFor(() => expect(screen.getAllByRole('row')).toHaveLength(6))
+
 // Single release path for the held response; afterEach calls it too, so a test that fails
 // before releasing leaves no pending response.
 let releaseHeldSearch = () => {}
@@ -167,7 +171,7 @@ describe('PaymentsPage payment list', () => {
 
     expect(getDataRow(0).Date).toBe('not-a-date')
     // A datetime attribute must hold a valid date, so there is no <time> here.
-    expect(within(getDataCells(0).Date).queryByRole('time')).toBeNull()
+    expect(within(getDataCells(0).Date).queryByRole('time')).not.toBeInTheDocument()
   })
 
   it('should request the first page of 5 payments and show 5 rows', async () => {
@@ -186,7 +190,7 @@ describe('PaymentsPage payment list', () => {
     // Synchronously after render the query is still pending.
     const status = screen.getByRole('status')
     expect(status.textContent).toBe('Loading payments…')
-    expect(screen.queryByRole('table')).toBeNull()
+    expect(screen.queryByRole('table')).not.toBeInTheDocument()
 
     await screen.findByRole('cell', { name: 'pay_134_1' })
 
@@ -227,7 +231,7 @@ describe('PaymentsPage payment list', () => {
   it('should name the table after the page heading', async () => {
     await renderLoadedPage()
 
-    expect(screen.getByRole('table', { name: 'All payments' })).toBeTruthy()
+    expect(screen.getByRole('table', { name: 'All payments' })).toBeInTheDocument()
   })
 
   it('should wrap the table in a keyboard-focusable region named after the heading', async () => {
@@ -237,7 +241,7 @@ describe('PaymentsPage payment list', () => {
     expect(region.tabIndex).toBe(0)
     expect(
       within(region).getByRole('table', { name: 'All payments' }),
-    ).toBeTruthy()
+    ).toBeInTheDocument()
   })
 })
 
@@ -256,7 +260,7 @@ describe('PaymentsPage search', () => {
 
     expect(
       within(screen.getByRole('search')).getByRole('button', { name: 'Search' }),
-    ).toBeTruthy()
+    ).toBeInTheDocument()
   })
 
   it.each(SUBMIT_WAYS)(
@@ -336,7 +340,7 @@ describe('PaymentsPage search', () => {
     await waitFor(() => expect(status.textContent).toBe(''))
     expect(
       screen.getByRole('table', { name: 'All payments' }).getAttribute('aria-busy'),
-    ).toBeNull()
+    ).not.toBeInTheDocument()
   })
 
   it('should trim the term before sending the Payment ID search', async () => {
@@ -412,7 +416,7 @@ describe('PaymentsPage search', () => {
     act(() => window.history.back())
 
     // popstate is async in jsdom, and the previous rows can linger until the list reloads.
-    await waitFor(() => expect(screen.getAllByRole('row')).toHaveLength(6))
+    await waitForFirstPage()
     expect(getSearchbox().value).toBe('')
 
     act(() => window.history.forward())
@@ -476,4 +480,171 @@ describe('PaymentsPage search', () => {
       expect(getDataRow(0)['Payment ID']).toBe('pay_134_1')
     },
   )
+})
+
+describe('PaymentsPage clear filters', () => {
+  const queryClearButton = () =>
+    screen.queryByRole('button', { name: I18N.CLEAR_FILTERS })
+  const getClearButton = () =>
+    screen.getByRole('button', { name: I18N.CLEAR_FILTERS })
+  // Applies the pay_134_1 search, so the Clear Filters button shows.
+  const applySearch = async (user: User) => {
+    await user.type(getSearchbox(), 'pay_134_1')
+    await user.click(getSearchButton())
+    await waitForSingleResult()
+  }
+  // Opens the page with the search already in the URL and waits for its single result.
+  const renderWithSearchInUrl = async (url = '/?search=pay_134_1') => {
+    window.history.replaceState(null, '', url)
+    renderPage()
+    await waitForSingleResult()
+  }
+
+  it('should not show a Clear Filters button when no filter is applied', async () => {
+    await renderLoadedPage()
+
+    expect(queryClearButton()).not.toBeInTheDocument()
+  })
+
+  it('should show a Clear Filters button inside the search landmark after a search', async () => {
+    const user = userEvent.setup()
+    await renderLoadedPage()
+
+    await applySearch(user)
+
+    expect(
+      within(screen.getByRole('search')).getByRole('button', {
+        name: I18N.CLEAR_FILTERS,
+      }),
+    ).toBeInTheDocument()
+  })
+
+  it('should show the Clear Filters button when the page loads with a search in the URL', async () => {
+    await renderWithSearchInUrl()
+
+    expect(getClearButton()).toBeInTheDocument()
+  })
+
+  it('should not show the Clear Filters button while unsearched text is typed', async () => {
+    const user = userEvent.setup()
+    await renderLoadedPage()
+
+    await user.type(getSearchbox(), 'pay_134_1')
+
+    expect(queryClearButton()).not.toBeInTheDocument()
+  })
+
+  it('should empty the search input and show the first 5 Payments when Clear Filters is clicked', async () => {
+    const user = userEvent.setup()
+    await renderLoadedPage()
+    await applySearch(user)
+
+    await user.click(getClearButton())
+
+    expect(getSearchbox().value).toBe('')
+    await waitForFirstPage()
+  })
+
+  it('should discard unsearched edits in the input when Clear Filters is clicked', async () => {
+    const user = userEvent.setup()
+    await renderLoadedPage()
+    await applySearch(user)
+    await user.type(getSearchbox(), '_edited')
+
+    await user.click(getClearButton())
+
+    expect(getSearchbox().value).toBe('')
+    await waitForFirstPage()
+  })
+
+  it('should remove the search from the URL, keeping the path and other params, when Clear Filters is clicked', async () => {
+    const user = userEvent.setup()
+    await renderWithSearchInUrl('/base/?search=pay_134_1&view=compact')
+
+    await user.click(getClearButton())
+
+    expect(window.location.pathname).toBe('/base/')
+    expect(window.location.search).toBe('?view=compact')
+    // Waits for the unfiltered list, so no request is still in flight when the test ends.
+    await waitForFirstPage()
+  })
+
+  it('should hide the Clear Filters button after clearing', async () => {
+    const user = userEvent.setup()
+    await renderWithSearchInUrl()
+
+    await user.click(getClearButton())
+
+    expect(queryClearButton()).not.toBeInTheDocument()
+    await waitForFirstPage()
+  })
+
+  it('should restore the search on Back after clearing and clear it again on Forward', async () => {
+    const user = userEvent.setup()
+    await renderLoadedPage()
+    await applySearch(user)
+    await user.click(getClearButton())
+    await waitForFirstPage()
+
+    act(() => window.history.back())
+
+    // popstate is async in jsdom, so wait for the search to come back.
+    await waitForSingleResult()
+    expect(getSearchbox().value).toBe('pay_134_1')
+    expect(getDataRow(0)['Payment ID']).toBe('pay_134_1')
+    expect(getClearButton()).toBeInTheDocument()
+
+    act(() => window.history.forward())
+
+    await waitForFirstPage()
+    expect(getSearchbox().value).toBe('')
+    expect(queryClearButton()).not.toBeInTheDocument()
+  })
+
+  it('should move focus to the search input after clearing', async () => {
+    const user = userEvent.setup()
+    await renderLoadedPage()
+    await applySearch(user)
+
+    await user.click(getClearButton())
+
+    // Focus must survive both the button unmounting and the full list reloading.
+    expect(queryClearButton()).not.toBeInTheDocument()
+    await waitForFirstPage()
+    expect(document.activeElement).toBe(getSearchbox())
+  })
+
+  it('should still search, not clear, when Enter is pressed in the input while Clear Filters is shown', async () => {
+    const user = userEvent.setup()
+    await renderLoadedPage()
+    await applySearch(user)
+
+    await user.clear(getSearchbox())
+    await user.type(getSearchbox(), 'pay_134_2{Enter}')
+
+    await waitFor(() =>
+      expect(window.location.search).toBe('?search=pay_134_2'),
+    )
+    await screen.findByRole('cell', { name: 'pay_134_2' })
+    expect(getDataRow(0)['Payment ID']).toBe('pay_134_2')
+    expect(getClearButton()).toBeInTheDocument()
+  })
+
+  it.each([
+    ['Enter', '{Enter}'],
+    ['Space', ' '],
+  ])('should clear with the keyboard using %s', async (_name, key) => {
+    const user = userEvent.setup()
+    await renderLoadedPage()
+    await applySearch(user)
+
+    await user.tab()
+    expect(document.activeElement).toBe(getClearButton())
+    await user.keyboard(key)
+
+    expect(getSearchbox().value).toBe('')
+    expect(window.location.search).toBe('')
+    expect(document.activeElement).toBe(getSearchbox())
+    await waitForFirstPage()
+  })
 })

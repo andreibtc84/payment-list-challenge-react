@@ -19,3 +19,5 @@
 **Applied search**: The Payment ID search currently driving the table. It lives in the URL as `?search=`, trimmed, and is absent when there is no search.
 
 **Draft**: The text currently typed in the search box. It becomes the Applied search only when Search is pressed (or Enter), and it follows the Applied search on page load and Back/Forward.
+
+**Applied filter**: Any filter currently driving the table, held in the URL. In Step 3 the only one is the Applied search; Currency joins it in Step 6. The Clear Filters button shows while at least one is applied.

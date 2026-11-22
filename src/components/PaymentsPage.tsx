@@ -50,11 +50,12 @@ const PaymentsTableHeader = () => (
 
 export const PaymentsPage = () => {
   const [filters, setFilters] = usePaymentFilters()
+  const hasAppliedFilters = filters.search !== ''
   // An empty search sends no param, so the query key matches the unfiltered list.
   const { data, isPending, isPlaceholderData } = usePayments({
     page: DEFAULT_PAGE,
     pageSize: PAGE_SIZE,
-    ...(filters.search && { search: filters.search }),
+    ...(hasAppliedFilters && { search: filters.search }),
   })
 
   return (
@@ -65,6 +66,7 @@ export const PaymentsPage = () => {
       <SearchForm
         term={filters.search}
         onSearch={(search) => setFilters({ search })}
+        onClear={hasAppliedFilters ? () => setFilters({ search: '' }) : undefined}
       />
       {/* Always rendered: a live region must exist before its text changes to be announced. */}
       <div role='status' aria-live='polite' className='sr-only'>

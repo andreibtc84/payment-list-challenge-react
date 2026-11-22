@@ -10,7 +10,7 @@ Your task is to build a payment search interface that allows users to:
 
 ## ✅ My Solution
 
-**Status:** Steps 1 (Basic Payment List) and 2 (Search by Payment ID) are done.
+**Status:** Steps 1 (Basic Payment List), 2 (Search by Payment ID) and 3 (Clear Filters) are done.
 
 **Live demo:** https://andreibtc84.github.io/payment-list-challenge-react/
 
@@ -26,6 +26,7 @@ npm run dev                                # start the app with the mock API
 npx vitest run --exclude src/App.test.tsx  # run our own tests once
 npm run test:step1                         # run the graded Step 1 test (watch mode)
 npm run test:step2                         # run the graded Step 2 tests (watch mode)
+npm run test:step3                         # run the graded Step 3 test (watch mode)
 npm run build                              # type-check and build for production
 ```
 
@@ -33,8 +34,8 @@ npm run build                              # type-check and build for production
 
 ### How it's built and why
 
-- Design decisions, each with the alternatives considered: [Step 1](docs/decisions/ADR-step1.md), [Step 2](docs/decisions/ADR-step2.md).
-- Specs (what was planned, the tests, and a system diagram): [Step 1](docs/specs/step-1-basic-payment-list.md) ([diagram](docs/specs/step-1-system-design.svg)), [Step 2](docs/specs/step-2-search-by-payment-id.md) ([diagram](docs/specs/step-2-system-design.svg)).
+- Design decisions, each with the alternatives considered: [Step 1](docs/decisions/ADR-step1.md), [Step 2](docs/decisions/ADR-step2.md), [Step 3](docs/decisions/ADR-step3.md), and [general decisions](docs/decisions/ADR-general.md) across steps (such as the React Compiler).
+- Specs (what was planned, the tests, and a system diagram): [Step 1](docs/specs/step-1-basic-payment-list.md) ([diagram](docs/specs/step-1-system-design.svg)), [Step 2](docs/specs/step-2-search-by-payment-id.md) ([diagram](docs/specs/step-2-system-design.svg)), [Step 3](docs/specs/step-3-clear-filters.md) ([diagram](docs/specs/step-3-system-design.svg)).
 - **CI** (`.github/workflows/ci.yml`): lint, type-check, tests and build on every pull request and every push to `main`. A push to `main` deploys to GitHub Pages only after those checks pass.
 
 The original challenge brief continues below, unchanged.
