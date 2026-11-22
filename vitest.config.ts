@@ -9,6 +9,7 @@ export default mergeConfig(
       reporters: ['junit', 'verbose'],
       environment: 'jsdom',
       globals: true,
+      setupFiles: ['./src/test/setup.ts'],
       // Dates render in local time; a fixed zone lets tests assert the exact text on any machine.
       env: { TZ: 'UTC' },
       outputFile: {
