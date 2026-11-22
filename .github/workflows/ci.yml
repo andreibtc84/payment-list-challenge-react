@@ -1,0 +1,91 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# Read-only by default; only the deploy job gets Pages permissions.
+permissions:
+  contents: read
+
+# A new push to a PR cancels the run it replaces; runs on main finish, so a deploy is never cut off.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      # `npm ci`, not `npm test`: that script runs `npm install` first, which can rewrite the lockfile.
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npx tsc -b
+
+      - name: Test (our test files)
+        run: npx vitest run --exclude src/App.test.tsx
+
+      # Graded tests for finished steps only; the filter widens as each step is finished.
+      - name: Test (graded, finished steps)
+        run: npx vitest run src/App.test.tsx -t "Step 1:"
+
+      - name: Build
+        run: npx vite build
+
+  # Deploys main to GitHub Pages, only after every check above has passed.
+  deploy:
+    needs: quality
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # No backend exists, so the hosted build serves the mock API from MSW in the browser.
+      - name: Build for GitHub Pages
+        run: npx vite build
+        env:
+          BASE_PATH: /${{ github.event.repository.name }}/
+          VITE_ENABLE_MOCKS: 'true'
+
+      - uses: actions/configure-pages@v6
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: dist
+
+      - id: deployment
+        uses: actions/deploy-pages@v5

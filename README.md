@@ -8,6 +8,36 @@ Your task is to build a payment search interface that allows users to:
 - Handle various edge cases and error states
 - Implement pagination for the table
 
+## ✅ My Solution
+
+**Status:** Step 1 (Basic Payment List) is done.
+
+**Live demo:** https://andreibtc84.github.io/payment-list-challenge-react/
+
+> The live site has no backend: the API is Mock Service Worker running in your browser, so all payments are mock data.
+
+### Run it locally
+
+Use the Node version in `.nvmrc`, then:
+
+```bash
+npm ci                                     # install the exact locked dependencies
+npm run dev                                # start the app with the mock API
+npx vitest run --exclude src/App.test.tsx  # run our own tests once
+npm run test:step1                         # run the graded Step 1 test (watch mode)
+npm run build                              # type-check and build for production
+```
+
+`npm test` runs every test file, including the graded tests for steps not built yet, which fail. It also runs `npm install` first, which can rewrite the lockfile.
+
+### How it's built and why
+
+- [Design decisions](docs/decisions/ADR-step1.md): the main choices for Step 1, each with the alternatives considered.
+- [Step 1 spec](docs/specs/step-1-basic-payment-list.md): what was planned before coding, the tests, and a [system diagram](docs/specs/step-1-system-design.svg).
+- **CI** (`.github/workflows/ci.yml`): lint, type-check, tests and build on every pull request and every push to `main`. A push to `main` deploys to GitHub Pages only after those checks pass.
+
+The original challenge brief continues below, unchanged.
+
 ## 📑 Table of Contents
 
 - [🛠️ Tech Stack](#️-tech-stack)

@@ -5,7 +5,16 @@ export default {
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
   theme: {
-    extend: {},
+    extend: {
+      // shadcn tokens from src/index.css; `<alpha-value>` keeps opacity modifiers (bg-muted/50) working.
+      colors: {
+        muted: {
+          DEFAULT: "hsl(var(--muted) / <alpha-value>)",
+          foreground: "hsl(var(--muted-foreground) / <alpha-value>)",
+        },
+        primary: "hsl(var(--primary) / <alpha-value>)",
+      },
+    },
   },
   plugins: [],
-} 
+}
