@@ -1,3 +1,4 @@
+// DEPRECATED: starter styled-components. New UI uses Tailwind + shadcn/ui (one styling system).
 import styled from "styled-components";
 
 export const Container = styled.div`
@@ -123,7 +124,7 @@ export const TableWrapper = styled.div`
 
 export const Table = styled.table`
   min-width: 100%;
-  text-sm: 14px;
+  font-size: 14px;
   text-align: left;
 `;
 
