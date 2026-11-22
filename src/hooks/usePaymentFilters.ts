@@ -1,4 +1,4 @@
-import { useMemo, useSyncExternalStore } from 'react'
+import { useSyncExternalStore } from 'react'
 
 export interface PaymentFilters {
   search: string
@@ -39,6 +39,6 @@ const setFilters = (patch: Partial<PaymentFilters>) => {
 
 export const usePaymentFilters = (): [PaymentFilters, typeof setFilters] => {
   const query = useSyncExternalStore(subscribe, getSnapshot)
-  const filters = useMemo(() => parseFilters(query), [query])
+  const filters = parseFilters(query)
   return [filters, setFilters]
 }

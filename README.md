@@ -34,7 +34,7 @@ npm run build                              # type-check and build for production
 
 ### How it's built and why
 
-- Design decisions, each with the alternatives considered: [Step 1](docs/decisions/ADR-step1.md), [Step 2](docs/decisions/ADR-step2.md), [Step 3](docs/decisions/ADR-step3.md).
+- Design decisions, each with the alternatives considered: [Step 1](docs/decisions/ADR-step1.md), [Step 2](docs/decisions/ADR-step2.md), [Step 3](docs/decisions/ADR-step3.md), and [general decisions](docs/decisions/ADR-general.md) across steps (such as the React Compiler).
 - Specs (what was planned, the tests, and a system diagram): [Step 1](docs/specs/step-1-basic-payment-list.md) ([diagram](docs/specs/step-1-system-design.svg)), [Step 2](docs/specs/step-2-search-by-payment-id.md) ([diagram](docs/specs/step-2-system-design.svg)), [Step 3](docs/specs/step-3-clear-filters.md) ([diagram](docs/specs/step-3-system-design.svg)).
 - **CI** (`.github/workflows/ci.yml`): lint, type-check, tests and build on every pull request and every push to `main`. A push to `main` deploys to GitHub Pages only after those checks pass.
 

@@ -41,7 +41,7 @@ The architecture and code decisions behind Step 2.
 
 **Decision.**
 - `usePaymentFilters()` returns `[filters, setFilters]`, where `filters` is `{ search: string }` in Step 2.
-- It reads with `useSyncExternalStore`. The snapshot is the `location.search` string, which is stable, and `filters` is parsed from it with `useMemo`, so the object keeps its identity until the URL changes.
+- It reads with `useSyncExternalStore`. The snapshot is the `location.search` string, which is stable, and `filters` is parsed from it with `useMemo`, so the object keeps its identity until the URL changes. (After Step 3 the React Compiler took over this memoisation and the `useMemo` was removed; see [general decision 1](ADR-general.md#1-the-react-compiler-does-the-memoisation).)
 - It subscribes to `popstate` and to its own change notifications, which it sends after each `pushState`.
 - `setFilters(patch)` merges a partial into the current filters, so a later currency change can't drop the search.
 - Writes start from `location.href`, which keeps the GitHub Pages base path and any query params the app doesn't know.
