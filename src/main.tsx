@@ -4,13 +4,17 @@ import './index.css';
 import App from './App';
 
 async function enableMocking() {
-  if (process.env.NODE_ENV !== 'development') {
+  // There's no real backend: the hosted build opts in to the mock API with VITE_ENABLE_MOCKS.
+  if (!import.meta.env.DEV && import.meta.env.VITE_ENABLE_MOCKS !== 'true') {
     return;
   }
 
   try {
     const { worker } = await import('./mocks/browser');
-    await worker.start();
+    // The worker file sits under the base path (/<repo>/ on GitHub Pages), not the site root.
+    await worker.start({
+      serviceWorker: { url: `${import.meta.env.BASE_URL}mockServiceWorker.js` },
+    });
     console.log('Mock Service Worker started');
   } catch (error) {
     console.error('Failed to start Mock Service Worker:', error);
