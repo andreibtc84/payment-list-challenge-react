@@ -40,7 +40,7 @@ jobs:
       - name: Test (our test files)
         run: npx vitest run --exclude src/App.test.tsx
 
-      # Graded tests for finished steps only; each step's PR widens the filter by one step.
+      # Graded tests for finished steps only; the filter widens as each step is finished.
       - name: Test (graded, finished steps)
         run: npx vitest run src/App.test.tsx -t "Step 1:"
 
