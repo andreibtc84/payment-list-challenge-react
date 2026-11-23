@@ -20,7 +20,11 @@
 
 **Draft**: The text currently typed in the search box. It becomes the Applied search only when Search is pressed (or Enter), and it follows the Applied search on page load and Back/Forward.
 
-**Applied filter**: Any filter currently driving the table, held in the URL. In Step 3 the only one is the Applied search; Currency joins it in Step 6. The Clear Filters button shows while at least one is applied.
+**Applied filter**: Any filter currently driving the table, held in the URL: the Applied search and the Currency filter. The Clear Filters button shows while at least one is applied, and clears them all.
+
+**Currency filter**: The Currency currently driving the table. It lives in the URL as `?currency=` (one of the codes in `CURRENCIES`), and is absent when no Currency is chosen. An unlisted value counts as no Currency filter.
+
+**Currency select**: The dropdown named "Filter by currency" that sets the Currency filter. Its first option, "Currencies", means no Currency filter; a choice applies immediately, without pressing Search.
 
 **Not-found message**: The "Payment not found." text (`I18N.PAYMENT_NOT_FOUND`) shown in place of the table when the payments API answers an Applied search with HTTP 404 (for example `pay_404`).
 

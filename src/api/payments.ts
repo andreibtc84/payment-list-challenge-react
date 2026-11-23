@@ -1,11 +1,12 @@
 import axios, { isAxiosError } from 'axios'
-import { API_URL } from '../constants'
+import { API_URL, type Currency } from '../constants'
 import { I18N } from '../constants/i18n'
 import type { Pagination, PaymentSearchResponse } from '../types/payment'
 
 // Its own name, so the request can grow without changing the response type.
 export interface PaymentQueryParams extends Pagination {
   search?: string
+  currency?: Currency
 }
 
 // axios builds the query string from `params` and rejects on non-2xx responses.

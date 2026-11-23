@@ -89,8 +89,16 @@ const getSearchbox = () =>
 
 const getSearchButton = () => screen.getByRole('button', { name: 'Search' })
 
+const getCurrencySelect = () =>
+  screen.getByRole<HTMLSelectElement>('combobox', {
+    name: I18N.CURRENCY_FILTER_LABEL,
+  })
+
 const getClearButton = () =>
   screen.getByRole('button', { name: I18N.CLEAR_FILTERS })
+
+const queryClearButton = () =>
+  screen.queryByRole('button', { name: I18N.CLEAR_FILTERS })
 
 // Collects the URL of every payments request from now on (listeners are removed in afterEach).
 const captureRequests = () => {
@@ -385,6 +393,9 @@ describe('PaymentsPage search', () => {
     await renderLoadedPage()
 
     await user.click(getSearchbox())
+    // The currency select sits between the input and Search, as in the screenshot.
+    await user.tab()
+    expect(document.activeElement).toBe(getCurrencySelect())
     await user.tab()
 
     // Natively disabled buttons drop out of the Tab order; aria-disabled must not.
@@ -486,8 +497,6 @@ describe('PaymentsPage search', () => {
 })
 
 describe('PaymentsPage clear filters', () => {
-  const queryClearButton = () =>
-    screen.queryByRole('button', { name: I18N.CLEAR_FILTERS })
   // Applies the pay_134_1 search, so the Clear Filters button shows.
   const applySearch = async (user: User) => {
     await user.type(getSearchbox(), 'pay_134_1')
@@ -648,6 +657,55 @@ describe('PaymentsPage clear filters', () => {
     expect(document.activeElement).toBe(getSearchbox())
     await waitForFirstPage()
   })
+
+  it.each<[string, (user: User) => Promise<void>]>([
+    [
+      'chosen in the select',
+      async (user) => {
+        await renderLoadedPage()
+        await user.selectOptions(getCurrencySelect(), 'EUR')
+      },
+    ],
+    [
+      'loaded from the URL',
+      async () => {
+        window.history.replaceState(null, '', '/?currency=EUR')
+        renderPage()
+      },
+    ],
+  ])('should show the Clear Filters button when only a Currency filter is applied, %s', async (_name, applyCurrency) => {
+    const user = userEvent.setup()
+
+    await applyCurrency(user)
+
+    expect(
+      within(screen.getByRole('search')).getByRole('button', {
+        name: I18N.CLEAR_FILTERS,
+      }),
+    ).toBeInTheDocument()
+  })
+
+  it.each([
+    ['only a Currency filter', '/base/?currency=EUR&view=compact'],
+    ['a Currency filter and a search', '/base/?search=pay_134&currency=EUR&view=compact'],
+  ])('should reset every filter in one history entry when Clear Filters is clicked with %s', async (_name, url) => {
+    window.history.replaceState(null, '', url)
+    const user = userEvent.setup()
+    renderPage()
+    // No wait for results: the search + currency case would be a Step 7 claim; only clearing is checked.
+    const entries = window.history.length
+
+    await user.click(getClearButton())
+
+    expect(getCurrencySelect()).toHaveDisplayValue(I18N.CURRENCIES_OPTION)
+    expect(getSearchbox().value).toBe('')
+    expect(window.location.pathname).toBe('/base/')
+    expect(window.location.search).toBe('?view=compact')
+    expect(window.history.length).toBe(entries + 1)
+    expect(queryClearButton()).not.toBeInTheDocument()
+    await waitForFirstPage()
+    expect(document.activeElement).toBe(getSearchbox())
+  })
 })
 
 // The mock API answers pay_404 with 404 (README Step 4), pay_500 with 500 (Step 5) and 401 with 401.
@@ -763,5 +821,178 @@ describe.each([
 
     expect(await screen.findByText(message)).toBeInTheDocument()
     expect(screen.queryByRole('table')).not.toBeInTheDocument()
+  })
+})
+
+describe('PaymentsPage currency filter', () => {
+  // Checks every data row's Currency cell: the unfiltered first page already has a USD row,
+  // so one matching row wouldn't prove the filter.
+  const waitForOnlyCurrency = (currency: string) =>
+    waitFor(() => {
+      const rows = screen.getAllByRole('row').slice(1)
+      expect(rows.length).toBeGreaterThan(0)
+      rows.forEach((_, index) => expect(getDataRow(index).Currency).toBe(currency))
+    })
+
+  it('should show a currency select named "Filter by currency" inside the search landmark', async () => {
+    await renderLoadedPage()
+
+    expect(
+      within(screen.getByRole('search')).getByRole('combobox', {
+        name: I18N.CURRENCY_FILTER_LABEL,
+      }),
+    ).toBeInTheDocument()
+  })
+
+  it('should list "Currencies" first, then every currency code in order', async () => {
+    await renderLoadedPage()
+
+    const options = within(getCurrencySelect()).getAllByRole('option')
+
+    expect(options.map((option) => option.textContent)).toEqual([
+      I18N.CURRENCIES_OPTION,
+      'USD',
+      'EUR',
+      'GBP',
+      'AUD',
+      'CAD',
+      'ZAR',
+      'JPY',
+      'CZK',
+    ])
+  })
+
+  it.each([
+    ['/', I18N.CURRENCIES_OPTION],
+    ['/?currency=GBP', 'GBP'],
+  ])('should show the Currency filter from the URL %s as the selected option "%s"', (url, selected) => {
+    window.history.replaceState(null, '', url)
+    renderPage()
+
+    expect(getCurrencySelect()).toHaveDisplayValue(selected)
+  })
+
+  it('should show only Payments in the chosen currency and send it without a search param', async () => {
+    const user = userEvent.setup()
+    await renderLoadedPage()
+    const requestedUrls = captureRequests()
+
+    await user.selectOptions(getCurrencySelect(), 'USD')
+
+    await waitForOnlyCurrency('USD')
+    expect(screen.getAllByRole('row')).toHaveLength(6) // 1 header + 5 USD payments
+    expect(requestedUrls.at(-1)?.searchParams.get('currency')).toBe('USD')
+    expect(requestedUrls.at(-1)?.searchParams.has('search')).toBe(false)
+  })
+
+  it('should put the Currency filter in the URL and keep focus on the select after choosing', async () => {
+    const user = userEvent.setup()
+    await renderLoadedPage()
+
+    await user.selectOptions(getCurrencySelect(), 'EUR')
+
+    expect(window.location.search).toBe('?currency=EUR')
+    expect(document.activeElement).toBe(getCurrencySelect())
+    await waitForOnlyCurrency('EUR')
+  })
+
+  it('should show only Payments in the currency from the URL when the page loads with ?currency=EUR', async () => {
+    window.history.replaceState(null, '', '/?currency=EUR')
+    const requestedUrls = captureRequests()
+    renderPage()
+
+    await waitForOnlyCurrency('EUR')
+    expect(requestedUrls[0].searchParams.get('currency')).toBe('EUR')
+  })
+
+  it('should remove the Currency filter and show the first 5 Payments when "Currencies" is chosen', async () => {
+    window.history.replaceState(null, '', '/?currency=EUR')
+    const user = userEvent.setup()
+    renderPage()
+    await waitForOnlyCurrency('EUR')
+    const requestedUrls = captureRequests()
+
+    await user.selectOptions(getCurrencySelect(), I18N.CURRENCIES_OPTION)
+
+    await screen.findByRole('cell', { name: 'pay_134_1' })
+    await waitForFirstPage()
+    expect(window.location.search).toBe('')
+    expect(requestedUrls.at(-1)?.searchParams.has('currency')).toBe(false)
+  })
+
+  it('should restore the previous currency and rows on Back and re-apply the currency on Forward', async () => {
+    const user = userEvent.setup()
+    await renderLoadedPage()
+    await user.selectOptions(getCurrencySelect(), 'USD')
+    await waitForOnlyCurrency('USD')
+
+    act(() => window.history.back())
+
+    // popstate is async in jsdom, so wait for the unfiltered list to come back.
+    await screen.findByRole('cell', { name: 'pay_134_2' })
+    expect(getCurrencySelect()).toHaveDisplayValue(I18N.CURRENCIES_OPTION)
+    await waitForFirstPage()
+
+    act(() => window.history.forward())
+
+    await waitForOnlyCurrency('USD')
+    expect(getCurrencySelect()).toHaveDisplayValue('USD')
+  })
+
+  it.each(['XYZ', 'usd'])(
+    'should ignore the unlisted currency "%s" in the URL: Currencies selected, no currency sent, no Clear Filters',
+    async (currency) => {
+      window.history.replaceState(null, '', `/?currency=${currency}`)
+      const requestedUrls = captureRequests()
+      await renderLoadedPage()
+
+      expect(getCurrencySelect()).toHaveDisplayValue(I18N.CURRENCIES_OPTION)
+      expect(requestedUrls[0].searchParams.has('currency')).toBe(false)
+      expect(queryClearButton()).not.toBeInTheDocument()
+    },
+  )
+
+  it('should keep the two filters independent: typing leaves the currency, choosing a currency leaves the unsearched text unapplied', async () => {
+    const user = userEvent.setup()
+    await renderLoadedPage()
+    await user.selectOptions(getCurrencySelect(), 'EUR')
+    await waitForOnlyCurrency('EUR')
+    const requestedUrls = captureRequests()
+
+    await user.type(getSearchbox(), 'pay_134_1')
+    expect(getCurrencySelect()).toHaveDisplayValue('EUR')
+    expect(window.location.search).toBe('?currency=EUR')
+
+    await user.selectOptions(getCurrencySelect(), 'GBP')
+    await waitForOnlyCurrency('GBP')
+    expect(window.location.search).toBe('?currency=GBP')
+    expect(requestedUrls.at(-1)?.searchParams.has('search')).toBe(false)
+  })
+
+  it('should show the Error message in place of the table when the request fails while a currency is chosen', async () => {
+    const user = userEvent.setup()
+    await renderLoadedPage()
+    server.use(
+      http.get(`*${API_URL}`, () => new HttpResponse(null, { status: 500 }), { once: true }),
+    )
+
+    await user.selectOptions(getCurrencySelect(), 'EUR')
+
+    expect(await screen.findByText(I18N.INTERNAL_SERVER_ERROR)).toBeInTheDocument()
+    expect(screen.queryByRole('table')).not.toBeInTheDocument()
+    expect(getCurrencySelect()).toHaveDisplayValue('EUR')
+  })
+
+  it('should not add a history entry when the applied currency is chosen again', async () => {
+    const user = userEvent.setup()
+    await renderLoadedPage()
+    await user.selectOptions(getCurrencySelect(), 'EUR')
+    await waitForOnlyCurrency('EUR')
+    const entries = window.history.length
+
+    await user.selectOptions(getCurrencySelect(), 'EUR')
+
+    expect(window.history.length).toBe(entries)
+    expect(window.location.search).toBe('?currency=EUR')
   })
 })

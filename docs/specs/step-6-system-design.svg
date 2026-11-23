@@ -1,0 +1,146 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1110 700" width="1110" height="700" role="img" aria-labelledby="title desc" font-family="system-ui, -apple-system, Segoe UI, Roboto, sans-serif">
+  <title id="title">Step 6 system design</title>
+  <desc id="desc">In the browser, main.tsx starts the MSW worker in development, or in the GitHub Pages build, and renders App, which provides the TanStack Query client. App renders PaymentsPage. PaymentsPage reads the applied filters, the Payment ID search and the currency, from usePaymentFilters, which reads the browser URL's ?search= and ?currency= with useSyncExternalStore, keeps a currency only if it is one of the listed codes, writes both with history.pushState from one key list, and follows Back and Forward through popstate. PaymentsPage renders SearchForm, passing onSearch, onCurrencyChange, and onClear only while a filter is applied. SearchForm holds the typed draft and a native currency select named Filter by currency, listing Currencies and every code in CURRENCIES; its value comes from the URL. On submit it calls onSearch; choosing a currency calls onCurrencyChange straight away; Clear Filters calls onClear, which clears both filters in one history entry, and then focuses the search input. All three call setFilters on the hook. PaymentsPage also uses lib/format and the ui components Table, Badge, Skeleton, Button and Input, with the search Input and the currency select sharing one set of field classes, and calls usePayments, a useQuery hook with keepPreviousData, which calls fetchPayments in api/payments, which sends GET /api/payments with page, pageSize, and search and currency only when they are set. When the query fails, PaymentsPage passes the error to getErrorMessage in api/payments, which maps 404 to the Payment not found message, 500 to the Internal server error message, and any other failure to Something went wrong, shown in the always-rendered status region in place of the table. In the browser the MSW service worker answers from the mock handlers, which filter by currency and return 404 for pay_404, 500 for pay_500 and 401 for 401. In tests, Vitest with jsdom in UTC runs a setup file that loads the jest-dom matchers and resets the URL after every test. PaymentsPage.test renders PaymentsPage and drives it with user-event against the MSW Node server, which uses the same mock handlers, and now also checks the currency select, that every row shows the chosen currency, the URL, history and Clear Filters. usePaymentFilters.test tests the hook, including currency parsing and writing, format.test unit-tests lib/format, and payments.test unit-tests getErrorMessage.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#374151"/>
+    </marker>
+    <style>
+      .group { fill: #f9fafb; stroke: #9ca3af; stroke-width: 1.5; stroke-dasharray: 6 4; }
+      .group-label { fill: #374151; font-size: 14px; font-weight: 600; }
+      .node { fill: #ffffff; stroke: #374151; stroke-width: 1.5; }
+      .new { fill: #eff6ff; stroke: #1d4ed8; stroke-width: 2; }
+      .mock { fill: #fef3c7; stroke: #92400e; stroke-width: 1.5; }
+      .name { fill: #111827; font-size: 15px; font-weight: 600; }
+      .detail { fill: #374151; font-size: 12px; }
+      .edge { fill: none; stroke: #374151; stroke-width: 1.5; marker-end: url(#arrow); }
+      .edge2 { fill: none; stroke: #374151; stroke-width: 1.5; marker-start: url(#arrow); marker-end: url(#arrow); }
+      .edge-label { fill: #374151; font-size: 12px; font-style: italic; }
+      .legend { fill: #374151; font-size: 12px; }
+    </style>
+  </defs>
+
+  <!-- Background, so the diagram reads the same on light and dark pages. -->
+  <rect width="1110" height="700" fill="#ffffff"/>
+
+  <!-- Browser -->
+  <rect class="group" x="20" y="20" width="1070" height="380" rx="10"/>
+  <text class="group-label" x="36" y="44">Browser: Vite dev server, or the GitHub Pages build</text>
+
+  <rect class="node" x="40" y="60" width="190" height="50" rx="6"/>
+  <text class="name" x="135" y="81" text-anchor="middle">main.tsx</text>
+  <text class="detail" x="135" y="99" text-anchor="middle">starts MSW: dev or Pages build</text>
+
+  <rect class="node" x="250" y="60" width="190" height="50" rx="6"/>
+  <text class="name" x="345" y="81" text-anchor="middle">App</text>
+  <text class="detail" x="345" y="99" text-anchor="middle">QueryClientProvider</text>
+
+  <rect class="new" x="460" y="60" width="190" height="50" rx="6"/>
+  <text class="name" x="555" y="81" text-anchor="middle">PaymentsPage</text>
+  <text class="detail" x="555" y="99" text-anchor="middle">sends only the set filters</text>
+
+  <rect class="node" x="670" y="60" width="190" height="50" rx="6"/>
+  <text class="name" x="765" y="81" text-anchor="middle">usePayments</text>
+  <text class="detail" x="765" y="99" text-anchor="middle">useQuery + keepPreviousData</text>
+
+  <rect class="new" x="880" y="60" width="190" height="64" rx="6"/>
+  <text class="name" x="975" y="81" text-anchor="middle">api/payments</text>
+  <text class="detail" x="975" y="99" text-anchor="middle">fetchPayments: GET + currency</text>
+  <text class="detail" x="975" y="115" text-anchor="middle">getErrorMessage: status → text</text>
+
+  <rect class="new" x="250" y="190" width="190" height="64" rx="6"/>
+  <text class="name" x="345" y="211" text-anchor="middle">SearchForm</text>
+  <text class="detail" x="345" y="229" text-anchor="middle">draft, currency select,</text>
+  <text class="detail" x="345" y="245" text-anchor="middle">Search, Clear Filters</text>
+
+  <rect class="node" x="460" y="190" width="190" height="80" rx="6"/>
+  <text class="name" x="555" y="211" text-anchor="middle">lib/format</text>
+  <text class="detail" x="555" y="229" text-anchor="middle">formatAmount, formatDate,</text>
+  <text class="detail" x="555" y="245" text-anchor="middle">isValidDate: date-fns parseISO,</text>
+  <text class="detail" x="555" y="261" text-anchor="middle">bad dates shown as raw text</text>
+
+  <rect class="new" x="670" y="190" width="190" height="64" rx="6"/>
+  <text class="name" x="765" y="211" text-anchor="middle">components/ui</text>
+  <text class="detail" x="765" y="229" text-anchor="middle">Table, Badge, Skeleton,</text>
+  <text class="detail" x="765" y="245" text-anchor="middle">Button, Input, field classes</text>
+
+  <rect class="mock" x="880" y="190" width="190" height="50" rx="6"/>
+  <text class="name" x="975" y="211" text-anchor="middle">MSW service worker</text>
+  <text class="detail" x="975" y="229" text-anchor="middle">answers in the browser</text>
+
+  <rect class="new" x="250" y="310" width="190" height="60" rx="6"/>
+  <text class="name" x="345" y="331" text-anchor="middle">usePaymentFilters</text>
+  <text class="detail" x="345" y="349" text-anchor="middle">useSyncExternalStore,</text>
+  <text class="detail" x="345" y="363" text-anchor="middle">search + currency, validated</text>
+
+  <rect class="new" x="40" y="310" width="170" height="60" rx="6"/>
+  <text class="name" x="125" y="331" text-anchor="middle">Browser URL</text>
+  <text class="detail" x="125" y="349" text-anchor="middle">?search= &amp;currency= · push</text>
+  <text class="detail" x="125" y="363" text-anchor="middle">popstate (Back/Forward)</text>
+
+  <!-- Tests -->
+  <rect class="group" x="20" y="440" width="850" height="230" rx="10"/>
+  <text class="group-label" x="250" y="568">Tests: Vitest, jsdom, TZ=UTC</text>
+  <text class="detail" x="250" y="586">src/test/setup.ts: jest-dom matchers,</text>
+  <text class="detail" x="250" y="602">and a URL reset after each test</text>
+
+  <rect class="new" x="40" y="480" width="190" height="50" rx="6"/>
+  <text class="name" x="135" y="501" text-anchor="middle">PaymentsPage.test</text>
+  <text class="detail" x="135" y="519" text-anchor="middle">+ currency filter, every row</text>
+
+  <rect class="new" x="250" y="480" width="190" height="50" rx="6"/>
+  <text class="name" x="345" y="501" text-anchor="middle">usePaymentFilters.test</text>
+  <text class="detail" x="345" y="519" text-anchor="middle">+ currency parse and write</text>
+
+  <rect class="node" x="460" y="480" width="190" height="50" rx="6"/>
+  <text class="name" x="555" y="501" text-anchor="middle">format.test</text>
+  <text class="detail" x="555" y="519" text-anchor="middle">unit seam</text>
+
+  <rect class="mock" x="40" y="600" width="190" height="50" rx="6"/>
+  <text class="name" x="135" y="621" text-anchor="middle">MSW Node server</text>
+  <text class="detail" x="135" y="639" text-anchor="middle">answers in tests</text>
+
+  <!-- Shared mock data -->
+  <rect class="mock" x="880" y="600" width="190" height="50" rx="6"/>
+  <text class="name" x="975" y="621" text-anchor="middle">mocks/handlers</text>
+  <text class="detail" x="975" y="639" text-anchor="middle">filter by currency; error IDs</text>
+
+  <rect class="node" x="670" y="480" width="180" height="50" rx="6"/>
+  <text class="name" x="760" y="501" text-anchor="middle">payments.test</text>
+  <text class="detail" x="760" y="519" text-anchor="middle">getErrorMessage cases</text>
+
+  <!-- Legend -->
+  <rect class="new" x="700" y="560" width="18" height="14" rx="3"/>
+  <text class="legend" x="726" y="572">Changed in Step 6</text>
+
+  <!-- Runtime edges -->
+  <path class="edge" d="M230,85 H248"/>
+  <path class="edge" d="M440,85 H458"/>
+  <path class="edge" d="M650,85 H668"/>
+  <path class="edge" d="M860,85 H878"/>
+  <path class="edge" d="M480,110 L410,188"/>
+  <text class="edge-label" x="372" y="160">renders</text>
+  <path class="edge" d="M460,102 H450 V340 H442"/>
+  <text class="edge-label" x="456" y="300">filters</text>
+  <path class="edge" d="M555,110 V188"/>
+  <path class="edge" d="M630,110 L700,188"/>
+  <path class="edge" d="M345,254 V308"/>
+  <text class="edge-label" x="338" y="276" text-anchor="end">onSearch / onCurrencyChange</text>
+  <text class="edge-label" x="338" y="292" text-anchor="end">/ onClear → setFilters</text>
+  <path class="edge2" d="M248,340 H212"/>
+  <path class="edge" d="M975,124 V188"/>
+  <text class="edge-label" x="985" y="160">request</text>
+  <path class="edge" d="M975,240 V598"/>
+
+  <path class="edge" d="M600,60 V50 H960 V58"/>
+  <text class="edge-label" x="780" y="45" text-anchor="middle">error → getErrorMessage → message</text>
+
+  <!-- Test edges -->
+  <path class="edge" d="M135,480 V420 H660 V150 H590 V112"/>
+  <text class="edge-label" x="560" y="414">renders</text>
+  <path class="edge" d="M345,480 V372"/>
+  <path class="edge" d="M555,480 V272"/>
+  <path class="edge" d="M135,530 V598"/>
+  <path class="edge" d="M230,625 H878"/>
+  <path class="edge" d="M850,505 H872 V118 H878"/>
+</svg>

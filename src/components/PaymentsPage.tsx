@@ -51,12 +51,13 @@ const PaymentsTableHeader = () => (
 
 export const PaymentsPage = () => {
   const [filters, setFilters] = usePaymentFilters()
-  const hasAppliedFilters = filters.search !== ''
-  // An empty search sends no param, so the query key matches the unfiltered list.
+  const hasAppliedFilters = filters.search !== '' || filters.currency !== ''
+  // Each empty filter sends no param, so the query key matches the unfiltered list.
   const { data, error, isPending, isPlaceholderData } = usePayments({
     page: DEFAULT_PAGE,
     pageSize: PAGE_SIZE,
-    ...(hasAppliedFilters && { search: filters.search }),
+    ...(filters.search && { search: filters.search }),
+    ...(filters.currency && { currency: filters.currency }),
   })
   const errorMessage = getErrorMessage(error)
 
@@ -67,8 +68,13 @@ export const PaymentsPage = () => {
       </h2>
       <SearchForm
         term={filters.search}
+        currency={filters.currency}
         onSearch={(search) => setFilters({ search })}
-        onClear={hasAppliedFilters ? () => setFilters({ search: '' }) : undefined}
+        onCurrencyChange={(currency) => setFilters({ currency })}
+        // One call clears both, so Clear Filters is a single Back step.
+        onClear={
+          hasAppliedFilters ? () => setFilters({ search: '', currency: '' }) : undefined
+        }
       />
       {/* Always rendered: a live region must exist before its text changes to be announced.
           One region for loading and any error message; they never show at the same time. */}

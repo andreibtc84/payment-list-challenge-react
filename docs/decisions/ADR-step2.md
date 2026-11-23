@@ -70,7 +70,7 @@ The architecture and code decisions behind Step 2.
 
 **Consequences.**
 - Many searches mean many history entries.
-- When currency is added (Step 6), the comparison has to cover every filter, not only `search`.
+- When currency is added (Step 6), the comparison has to cover every filter, not only `search`. Done in Step 6: it compares every filter ([Step 6 decisions](ADR-step6.md#3-the-currency-lives-in-the-url-unlisted-values-mean-no-filter)).
 
 ## 4. `SearchForm` owns the draft; the draft follows the URL
 

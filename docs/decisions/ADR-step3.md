@@ -29,7 +29,7 @@ The architecture and code decisions behind Step 3.
 **Consequences.**
 - The button always matches the URL: on page load with a shared link, after a search, and on Back/Forward.
 - The button mounts and unmounts, so focus needs care (decision 5).
-- When the currency filter arrives (Step 6), "any filter" has to include it.
+- When the currency filter arrives (Step 6), "any filter" has to include it. Done in Step 6.
 
 ## 2. Clearing writes the URL and adds a history entry
 
@@ -60,7 +60,7 @@ The architecture and code decisions behind Step 3.
 
 **Consequences.**
 - The button can't be shown without a handler.
-- The "any filter applied" rule lives in one place for Step 6 to extend. At Step 6 the `search` param must go back to checking `filters.search` itself, or a currency-only filter would send an empty `search`.
+- The "any filter applied" rule lives in one place for Step 6 to extend. At Step 6 the `search` param must go back to checking `filters.search` itself, or a currency-only filter would send an empty `search`. Done in Step 6: each filter is sent only when it's set.
 
 ## 4. A `type="button"` inside the search form
 
