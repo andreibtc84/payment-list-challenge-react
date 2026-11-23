@@ -1,7 +1,6 @@
 export const API_URL = "/api/payments";
 
-// README: page=1, pageSize=5. pageSize is sent explicitly because the mock API defaults to 10.
-export const DEFAULT_PAGE = 1;
+// README: pageSize=5, sent explicitly because the mock API defaults to 10.
 export const PAGE_SIZE = 5;
 
 // as const: the Currency type comes from this list, so a mistyped code fails to compile.

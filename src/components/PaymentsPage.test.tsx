@@ -5,9 +5,9 @@ import { http, HttpResponse } from 'msw'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { API_URL, type Currency } from '../constants'
 import { I18N } from '../constants/i18n'
-import { mockPayments134 } from '../mocks/mockPaymentsData'
+import { mockPayments123, mockPayments134, mockPayments456 } from '../mocks/mockPaymentsData'
 import { server } from '../mocks/node'
-import type { Payment, PaymentStatus } from '../types/payment'
+import type { Payment, PaymentSearchResponse, PaymentStatus } from '../types/payment'
 import { PaymentsPage } from './PaymentsPage'
 
 // Fresh QueryClient per test, not <App />: App's shared client would cache data across tests
@@ -132,7 +132,14 @@ const waitForPaymentIds = (ids: string[]) =>
 let releaseHeldSearch = () => {}
 
 // Holds the response of the next payments request until releaseHeldSearch() is called.
-const holdNextSearch = () => {
+const holdNextSearch = (
+  reply: PaymentSearchResponse = {
+    payments: [mockPayments134[0]],
+    total: 1,
+    page: 1,
+    pageSize: 5,
+  },
+) => {
   const gate = new Promise<void>((resolve) => {
     releaseHeldSearch = resolve
   })
@@ -141,12 +148,7 @@ const holdNextSearch = () => {
       `*${API_URL}`,
       async () => {
         await gate
-        return HttpResponse.json({
-          payments: [mockPayments134[0]],
-          total: 1,
-          page: 1,
-          pageSize: 5,
-        })
+        return HttpResponse.json(reply)
       },
       { once: true },
     ),
@@ -1138,5 +1140,307 @@ describe('PaymentsPage combined filters', () => {
     expect(getSearchbox()).toHaveValue('pay_134')
     expect(getCurrencySelect()).toHaveDisplayValue('ZAR')
     expect(getClearButton()).toBeInTheDocument()
+  })
+})
+
+describe('PaymentsPage pagination', () => {
+  const PAGE_1_IDS = ['pay_134_1', 'pay_134_2', 'pay_134_3', 'pay_134_4', 'pay_134_5']
+  const PAGE_2_IDS = ['pay_456_1', 'pay_456_2', 'pay_456_3', 'pay_456_4', 'pay_456_5']
+  const PAGE_5_IDS = ['pay_789_1', 'pay_205_1', 'pay_205_2', 'pay_205_3', 'pay_205_4']
+  const PAGE_2_REPLY = { payments: mockPayments456.slice(0, 5), total: 77, page: 2, pageSize: 5 }
+  const getPrevious = () => screen.getByRole('button', { name: I18N.PREVIOUS_BUTTON })
+  const getNext = () => screen.getByRole('button', { name: I18N.NEXT_BUTTON })
+  const queryPagination = () =>
+    screen.queryByRole('navigation', { name: I18N.PAGINATION_LABEL })
+
+  it('should show Previous (disabled), "Page 1" and Next once the first page loads', async () => {
+    await renderLoadedPage()
+
+    expect(getPrevious()).toBeDisabled()
+    expect(screen.getByText(`${I18N.PAGE_LABEL} 1`)).toBeInTheDocument()
+    expect(getNext()).toBeEnabled()
+  })
+
+  it('should request and show page 2 when the page opens with ?page=2', async () => {
+    window.history.replaceState(null, '', '/?page=2')
+    const requestedUrls = captureRequests()
+    renderPage()
+
+    await waitForPaymentIds(PAGE_2_IDS)
+    expect(requestedUrls[0].searchParams.get('page')).toBe('2')
+    expect(requestedUrls[0].searchParams.get('pageSize')).toBe('5')
+    expect(screen.getByText(`${I18N.PAGE_LABEL} 2`)).toBeInTheDocument()
+    expect(getPrevious()).toBeEnabled()
+  })
+
+  it('should request page 2 and show its payments when Next is pressed', async () => {
+    const user = userEvent.setup()
+    await renderLoadedPage()
+    const requestedUrls = captureRequests()
+
+    await user.click(getNext())
+
+    await waitForPaymentIds(PAGE_2_IDS)
+    expect(requestedUrls.at(-1)?.searchParams.get('page')).toBe('2')
+    expect(requestedUrls.at(-1)?.searchParams.get('pageSize')).toBe('5')
+    expect(screen.getByText(`${I18N.PAGE_LABEL} 2`)).toBeInTheDocument()
+    expect(getPrevious()).toBeEnabled()
+  })
+
+  it('should return to page 1 when Previous is pressed after Next', async () => {
+    const user = userEvent.setup()
+    await renderLoadedPage()
+    await user.click(getNext())
+    await waitForPaymentIds(PAGE_2_IDS)
+
+    await user.click(getPrevious())
+
+    await waitForPaymentIds(PAGE_1_IDS)
+    expect(screen.getByText(`${I18N.PAGE_LABEL} 1`)).toBeInTheDocument()
+    expect(getPrevious()).toBeDisabled()
+  })
+
+  // Both cases span 2+ pages: 16 EUR Payments, and 6 pay_205 Payments in USD.
+  it.each<[string, string, { search?: string; currency: Currency }, RegExp]>([
+    ['the Currency filter', '?currency=EUR', { currency: 'EUR' }, /^pay_/],
+    [
+      'the Payment ID search and the Currency filter',
+      '?search=pay_205&currency=USD',
+      { search: 'pay_205', currency: 'USD' },
+      /^pay_205/,
+    ],
+  ])('should keep %s in the request while paging', async (_name, query, filters, idPattern) => {
+    const user = userEvent.setup()
+    window.history.replaceState(null, '', `/${query}`)
+    renderPage()
+    await screen.findByText(`${I18N.PAGE_LABEL} 1`)
+    const requestedUrls = captureRequests()
+
+    await user.click(getNext())
+
+    await screen.findByText(`${I18N.PAGE_LABEL} 2`)
+    const sent = requestedUrls.at(-1)?.searchParams
+    expect(sent?.get('page')).toBe('2')
+    expect(sent?.get('currency')).toBe(filters.currency)
+    expect(sent?.get('search') ?? undefined).toBe(filters.search)
+    const rows = getDataRows()
+    expect(rows.length).toBeGreaterThan(0)
+    rows.forEach((row) => {
+      expect(row[I18N.TABLE_HEADER_CURRENCY]).toBe(filters.currency)
+      expect(row[I18N.TABLE_HEADER_PAYMENT_ID]).toMatch(idPattern)
+    })
+  })
+
+  it('should return to page 1 on Back after Next and to page 2 on Forward', async () => {
+    const user = userEvent.setup()
+    await renderLoadedPage()
+    await user.click(getNext())
+    await waitForPaymentIds(PAGE_2_IDS)
+
+    act(() => window.history.back())
+
+    // popstate is async in jsdom, and the previous rows can linger until the list reloads.
+    await waitForPaymentIds(PAGE_1_IDS)
+    expect(screen.getByText(`${I18N.PAGE_LABEL} 1`)).toBeInTheDocument()
+
+    act(() => window.history.forward())
+
+    await waitForPaymentIds(PAGE_2_IDS)
+    expect(screen.getByText(`${I18N.PAGE_LABEL} 2`)).toBeInTheDocument()
+  })
+
+  // Each start URL is on page 2 and has 2+ pages after the action: 6 pay_205 Payments, 16 EUR.
+  it.each<[string, string, (user: User) => Promise<void>]>([
+    [
+      'a new search is applied',
+      '/?page=2',
+      async (user) => {
+        await user.type(getSearchbox(), 'pay_205')
+        await user.click(getSearchButton())
+      },
+    ],
+    [
+      'a currency is chosen',
+      '/?page=2',
+      (user) => user.selectOptions(getCurrencySelect(), 'EUR'),
+    ],
+    [
+      'Clear Filters is clicked',
+      '/?search=pay_205&page=2',
+      (user) => user.click(getClearButton()),
+    ],
+    [
+      'the same search is applied again',
+      '/?search=pay_205&page=2',
+      (user) => user.click(getSearchButton()),
+    ],
+  ])('should return to page 1 when %s on page 2', async (_name, startUrl, perform) => {
+    const user = userEvent.setup()
+    window.history.replaceState(null, '', startUrl)
+    renderPage()
+    await screen.findByText(`${I18N.PAGE_LABEL} 2`)
+    const requestedUrls = captureRequests()
+
+    await perform(user)
+
+    await waitFor(() => expect(requestedUrls.at(-1)?.searchParams.get('page')).toBe('1'))
+    await screen.findByText(`${I18N.PAGE_LABEL} 1`)
+    expect(window.location.search).not.toContain('page=')
+  })
+
+  it('should not show Clear Filters on page 2 when no filter is applied', async () => {
+    window.history.replaceState(null, '', '/?page=2')
+    renderPage()
+
+    await screen.findByText(`${I18N.PAGE_LABEL} 2`)
+    expect(queryClearButton()).not.toBeInTheDocument()
+  })
+
+  it('should show no pagination controls while the first page is loading', async () => {
+    holdNextSearch()
+    renderPage()
+
+    try {
+      expect(await screen.findByRole('status')).toBeInTheDocument()
+      expect(queryPagination()).not.toBeInTheDocument()
+    } finally {
+      releaseHeldSearch()
+    }
+    await screen.findByRole('cell', { name: 'pay_134_1' })
+  })
+
+  it('should keep the controls and the previous rows while a later page loads', async () => {
+    const user = userEvent.setup()
+    await renderLoadedPage()
+    holdNextSearch(PAGE_2_REPLY)
+
+    await user.click(getNext())
+
+    try {
+      // The page-2 request is held, so this is the in-between state.
+      expect(screen.getAllByRole('row')).toHaveLength(6) // 1 header + 5 page-1 payments
+      expect(queryPagination()).toBeInTheDocument()
+      expect(getPrevious()).toBeInTheDocument()
+    } finally {
+      releaseHeldSearch()
+    }
+    await waitForPaymentIds(PAGE_2_IDS)
+  })
+
+  it('should keep "Page 1" while page 2 loads and show "Page 2" with its payments once it arrives', async () => {
+    const user = userEvent.setup()
+    await renderLoadedPage()
+    holdNextSearch(PAGE_2_REPLY)
+
+    await user.click(getNext())
+
+    try {
+      expect(screen.getByText(`${I18N.PAGE_LABEL} 1`)).toBeInTheDocument()
+    } finally {
+      releaseHeldSearch()
+    }
+    await waitForPaymentIds(PAGE_2_IDS)
+    expect(screen.getByText(`${I18N.PAGE_LABEL} 2`)).toBeInTheDocument()
+  })
+
+  it('should show no pagination controls when an error message replaces the table', async () => {
+    window.history.replaceState(null, '', '/?search=pay_500')
+    renderPage()
+
+    await screen.findByText(I18N.INTERNAL_SERVER_ERROR)
+    expect(queryPagination()).not.toBeInTheDocument()
+  })
+
+  it('should disable Next on the last page of the full list', async () => {
+    window.history.replaceState(null, '', '/?page=16')
+    renderPage()
+
+    await screen.findByText(`${I18N.PAGE_LABEL} 16`)
+    await waitForPaymentIds(['pay_35', 'pay_36'])
+    expect(getNext()).toBeDisabled()
+    expect(getPrevious()).toBeEnabled()
+  })
+
+  it('should disable both buttons for a result that fits on one page', async () => {
+    window.history.replaceState(null, '', '/?search=pay_134_1')
+    renderPage()
+
+    await waitForSingleResult()
+    expect(getPrevious()).toBeDisabled()
+    expect(getNext()).toBeDisabled()
+  })
+
+  it('should disable Next and move focus to Previous once the uncached last page of a filter arrives', async () => {
+    const user = userEvent.setup()
+    window.history.replaceState(null, '', '/?currency=AUD')
+    renderPage()
+    await screen.findByText(`${I18N.PAGE_LABEL} 1`)
+    holdNextSearch({
+      payments: mockPayments123.filter((payment) => payment.currency === 'AUD').slice(-5),
+      total: 10,
+      page: 2,
+      pageSize: 5,
+    })
+
+    await user.click(getNext())
+    releaseHeldSearch()
+
+    await screen.findByText(`${I18N.PAGE_LABEL} 2`)
+    expect(getNext()).toBeDisabled()
+    expect(getPrevious()).toHaveFocus()
+  })
+
+  it.each(['abc', '0', '-1', '1.5'])(
+    'should request page 1 for the bad page "%s" in the URL',
+    async (bad) => {
+      window.history.replaceState(null, '', `/?page=${bad}`)
+      const requestedUrls = captureRequests()
+      renderPage()
+
+      await waitForPaymentIds(PAGE_1_IDS)
+      expect(requestedUrls[0].searchParams.get('page')).toBe('1')
+      expect(screen.getByText(`${I18N.PAGE_LABEL} 1`)).toBeInTheDocument()
+    },
+  )
+
+  it('should redirect a page past the end to page 1 without adding a history entry', async () => {
+    window.history.replaceState(null, '', '/?page=99')
+    const entries = window.history.length
+    renderPage()
+
+    await waitForPaymentIds(PAGE_1_IDS)
+    expect(screen.getByText(`${I18N.PAGE_LABEL} 1`)).toBeInTheDocument()
+    expect(window.location.search).toBe('')
+    expect(window.history.length).toBe(entries)
+  })
+
+  it('should keep the filters when redirecting a page past the end', async () => {
+    window.history.replaceState(null, '', '/?currency=AUD&page=5')
+    renderPage()
+
+    await waitFor(() => {
+      const rows = getDataRows()
+      expect(rows.length).toBeGreaterThan(0)
+      rows.forEach((row) => expect(row[I18N.TABLE_HEADER_CURRENCY]).toBe('AUD'))
+    })
+    expect(screen.getByText(`${I18N.PAGE_LABEL} 1`)).toBeInTheDocument()
+    expect(window.location.search).toBe('?currency=AUD')
+  })
+
+  // Back to a page whose data is not cached: until it arrives, the previous filter's response
+  // (AUD, 2 pages) is still shown and must not be read as "page 5 is past the end".
+  it('should not redirect on Back to an uncached page while the previous filter\'s data is still shown', async () => {
+    window.history.replaceState(null, '', '/?currency=AUD')
+    renderPage()
+    await screen.findByText(`${I18N.PAGE_LABEL} 1`)
+
+    act(() => {
+      window.history.pushState(null, '', '/?page=5')
+      window.dispatchEvent(new PopStateEvent('popstate'))
+    })
+
+    await screen.findByText(`${I18N.PAGE_LABEL} 5`)
+    await waitForPaymentIds(PAGE_5_IDS)
+    expect(window.location.search).toBe('?page=5')
   })
 })

@@ -1,8 +1,10 @@
+import { useEffect } from 'react'
 import { getErrorMessage } from '../api/payments'
-import { DEFAULT_PAGE, PAGE_SIZE } from '../constants'
+import { PAGE_SIZE } from '../constants'
 import { I18N } from '../constants/i18n'
 import { usePaymentFilters } from '../hooks/usePaymentFilters'
 import { usePayments } from '../hooks/usePayments'
+import { Pagination } from './Pagination'
 import { SearchForm } from './SearchForm'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -50,16 +52,23 @@ const PaymentsTableHeader = () => (
 )
 
 export const PaymentsPage = () => {
-  const [filters, setFilters] = usePaymentFilters()
+  const [filters, setFilters, setPage] = usePaymentFilters()
   const hasAppliedFilters = filters.search !== '' || filters.currency !== ''
   // Each empty filter sends no param, so the query key matches the unfiltered list.
   const { data, error, isPending, isPlaceholderData } = usePayments({
-    page: DEFAULT_PAGE,
+    page: filters.page,
     pageSize: PAGE_SIZE,
     ...(filters.search && { search: filters.search }),
     ...(filters.currency && { currency: filters.currency }),
   })
   const errorMessage = getErrorMessage(error)
+  const totalPages = data ? Math.ceil(data.total / data.pageSize) : 0
+
+  // Placeholder data may come from other filters, so only a real response can say the page is past the end.
+  useEffect(() => {
+    if (!data || isPlaceholderData) return
+    if (filters.page > 1 && filters.page > totalPages) setPage(1, { replace: true })
+  }, [data, isPlaceholderData, filters.page, totalPages, setPage])
 
   return (
     <div className='px-4 py-8 sm:px-0'>
@@ -172,6 +181,15 @@ export const PaymentsPage = () => {
                 ))}
               </TableBody>
             </Table>
+          )}
+          {/* Outside the table, so it stays on screen while a later page loads. */}
+          {data && (
+            // The response's page, not the URL's: the label and buttons follow the rows on screen.
+            <Pagination
+              page={data.page}
+              totalPages={totalPages}
+              onPageChange={setPage}
+            />
           )}
         </div>
       )}
