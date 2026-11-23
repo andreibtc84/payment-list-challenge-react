@@ -6,6 +6,10 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   // GitHub Pages serves the app under /<repo>/; the deploy job sets BASE_PATH, dev and tests keep '/'.
   base: process.env.BASE_PATH ?? '/',
+  // Tags telemetry events with the build's commit; GitHub Actions sets GITHUB_SHA.
+  define: {
+    __APP_VERSION__: JSON.stringify(process.env.GITHUB_SHA ?? 'dev'),
+  },
   // React Compiler memoises components and hooks, so we write no useMemo/useCallback/memo.
   plugins: [react({ babel: { plugins: ['babel-plugin-react-compiler'] } })],
   // `@/` alias for the copied shadcn sources (as in shadcn's Vite guide); vitest.config.ts reuses it.

@@ -2,6 +2,8 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
 import App from './App';
+import { installGlobalErrorListeners, rootErrorHandlers } from './lib/telemetry';
+import { reportWebVitals } from './lib/webVitals';
 
 async function enableMocking() {
   // There's no real backend: the hosted build opts in to the mock API with VITE_ENABLE_MOCKS.
@@ -21,10 +23,15 @@ async function enableMocking() {
   }
 }
 
+// Before anything else runs, so no early error is missed.
+installGlobalErrorListeners();
+
 enableMocking().then(() => {
-  ReactDOM.createRoot(document.getElementById('root')!).render(
+  // Every environment: the console sink replaces React's default error message.
+  ReactDOM.createRoot(document.getElementById('root')!, rootErrorHandlers).render(
     <React.StrictMode>
       <App />
     </React.StrictMode>
   );
+  reportWebVitals();
 });

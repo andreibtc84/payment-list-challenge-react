@@ -40,8 +40,27 @@ npm run build                              # type-check and build for production
 ### How it's built and why
 
 - Design decisions, each with the alternatives considered: [Step 1](docs/decisions/ADR-step1.md), [Step 2](docs/decisions/ADR-step2.md), [Step 3](docs/decisions/ADR-step3.md), [Step 4](docs/decisions/ADR-step4.md), [Step 5](docs/decisions/ADR-step5.md), [Step 6](docs/decisions/ADR-step6.md), [Step 7](docs/decisions/ADR-step7.md), [Step 8](docs/decisions/ADR-step8.md), and [general decisions](docs/decisions/ADR-general.md) across steps (such as the React Compiler).
+- **Observability:** the app logs structured events to the browser console. Open DevTools to see them. Details: [spec](docs/specs/observability.md) ([diagram](docs/specs/observability-system-design.svg)) and [general decisions](docs/decisions/ADR-general.md#2-observability-structured-events-to-a-swappable-sink).
 - Specs (what was planned, the tests, and a system diagram): [Step 1](docs/specs/step-1-basic-payment-list.md) ([diagram](docs/specs/step-1-system-design.svg)), [Step 2](docs/specs/step-2-search-by-payment-id.md) ([diagram](docs/specs/step-2-system-design.svg)), [Step 3](docs/specs/step-3-clear-filters.md) ([diagram](docs/specs/step-3-system-design.svg)), [Step 4](docs/specs/step-4-handle-payment-not-found.md) ([diagram](docs/specs/step-4-system-design.svg)), [Step 5](docs/specs/step-5-handle-server-error.md) ([diagram](docs/specs/step-5-system-design.svg)), [Step 6](docs/specs/step-6-currency-filter.md) ([diagram](docs/specs/step-6-system-design.svg)), [Step 7](docs/specs/step-7-combined-filter.md) ([diagram](docs/specs/step-7-system-design.svg)), [Step 8](docs/specs/step-8-pagination.md) ([diagram](docs/specs/step-8-system-design.svg)).
 - **CI** (`.github/workflows/ci.yml`): lint, type-check, tests and build on every pull request and every push to `main`. A push to `main` deploys to GitHub Pages only after those checks pass.
+
+### Observability
+
+There's no backend, so observability means seeing what happens in the visitor's browser. Every event goes through one `track()` function in `src/lib/telemetry.ts`, which adds a timestamp, the app version (the commit SHA in CI builds), the environment, a per-page-load session ID and the path without the query string. It then sends the event to a sink, which logs it to the browser console at its level (`info`, `warn`, `error`). Each line starts with `[telemetry]` and the event name, followed by the object to expand.
+
+| Question | Events |
+|---|---|
+| Are payment requests failing, and how? How long do they take? | `payments_fetch_succeeded` / `payments_fetch_failed`: duration, outcome, status class, status, page, page size, currency, whether a search was applied |
+| Did the UI crash? | `ui_render_failed` (the page shows "Something went wrong!" under the header instead of going blank), `ui_uncaught_error`, `ui_recoverable_error` |
+| Did an event handler or a promise fail? | `window_error`, `unhandled_rejection` |
+| Is the page fast? | `web_vital`: LCP, INP, CLS, FCP and TTFB, with Google's rating and which element or phase was slow |
+| What do people do? | `search_submitted`, `currency_changed`, `filters_cleared`, `page_changed` |
+
+The search term is never logged, because it can be a customer's name, and neither are Payment IDs or the query string. Error messages are cut to 200 characters.
+
+**Extending it.** To add an event, add its name to `TelemetryEventName` in `src/lib/telemetry.ts` and call `track(name, level, fields)`. Fields are flat strings, numbers or booleans. To send events somewhere other than the console, pass a different sink to `setTelemetrySink()`. Tests do the same with a spy, and the test setup installs a silent sink before each test.
+
+**Nothing is collected remotely.** The console is the only destination. In production, a real sink would batch events and send them with `navigator.sendBeacon` when the page is hidden, to a collector or a vendor such as Sentry or Datadog. It would also add source-map upload, sampling, a `traceparent` header to tie requests to backend traces, p75 dashboards and alerts on the fetch error rate, and Lighthouse CI for lab data.
 
 The original challenge brief continues below, unchanged.
 
