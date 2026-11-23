@@ -108,5 +108,5 @@ The reasoning behind each choice is in [Step 6 decisions](../decisions/ADR-step6
 
 - **Hidden label:** the label is hidden, as in the screenshot. WCAG 3.3.2 relies on the purpose being clear from context. Real screen-reader and voice-control checks haven't been done.
 - **Arrow keys:** on Windows, arrows on a closed select change the value directly, so each press filters and adds a Back step. Only macOS Chrome was checked.
-- **Combined filters:** search + currency already combine, which is Step 7's to check. No matches shows "Payment not found.".
+- **Combined filters:** search + currency already combine, which is Step 7's to check. No matches shows "Payment not found.". (Checked and kept in [Step 7](step-7-combined-filter.md).)
 - **Browser checks:** the browser and 320px checks were one-off headless Chrome runs, not part of the test suite.
