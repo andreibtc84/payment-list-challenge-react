@@ -33,3 +33,9 @@
 **Fallback message**: The "Something went wrong!" text (`I18N.SOMETHING_WENT_WRONG`) shown in place of the table for any other failed request: another HTTP status (such as 401), a network error, or an unexpected non-HTTP error.
 
 **Error message**: Any of the Not-found, Server-error or Fallback messages. Only one shows at a time, in the page's status region, in place of the table.
+
+**Current page**: The page of results the table shows. It lives in the URL as `?page=`, a positive whole number, and is absent on page 1. A value that isn't a positive whole number counts as page 1. It is not an Applied filter.
+
+**Total pages**: `ceil(total / pageSize)`, from the payments API response. Next is disabled when the Current page is at or past it.
+
+**Pagination controls**: The Previous button, the "Page N" label and the Next button, in the table card's footer, inside a navigation landmark named "Pagination".
