@@ -1,17 +1,28 @@
 import { useRef, useState, type FormEvent } from 'react'
+import { CURRENCIES, isCurrency, type CurrencyFilter } from '../constants'
 import { I18N } from '../constants/i18n'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { fieldClassName, Input } from '@/components/ui/input'
+import { cn } from '@/lib/utils'
 
 const INPUT_ID = 'payment-search'
+const CURRENCY_ID = 'payment-currency'
 
 interface SearchFormProps {
   term: string
+  currency: CurrencyFilter
   onSearch: (term: string) => void
+  onCurrencyChange: (currency: CurrencyFilter) => void
   onClear?: () => void
 }
 
-export const SearchForm = ({ term, onSearch, onClear }: SearchFormProps) => {
+export const SearchForm = ({
+  term,
+  currency,
+  onSearch,
+  onCurrencyChange,
+  onClear,
+}: SearchFormProps) => {
   const [draft, setDraft] = useState(term)
   const [appliedTerm, setAppliedTerm] = useState(term)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -59,6 +70,28 @@ export const SearchForm = ({ term, onSearch, onClear }: SearchFormProps) => {
         value={draft}
         onChange={(event) => setDraft(event.target.value)}
       />
+      {/* No visible label, as in the screenshot; the hidden label names it for assistive tech. */}
+      <label htmlFor={CURRENCY_ID} className='sr-only'>
+        {I18N.CURRENCY_FILTER_LABEL}
+      </label>
+      {/* Controlled from the URL, so Back/Forward update it; a choice applies at once (no draft). */}
+      <select
+        id={CURRENCY_ID}
+        // About the screenshot's width from sm up; full width when the controls stack on phones.
+        className={cn(fieldClassName, 'sm:w-32')}
+        value={currency}
+        onChange={(event) => {
+          const { value } = event.target
+          onCurrencyChange(isCurrency(value) ? value : '')
+        }}
+      >
+        <option value=''>{I18N.CURRENCIES_OPTION}</option>
+        {CURRENCIES.map((currency) => (
+          <option key={currency} value={currency}>
+            {currency}
+          </option>
+        ))}
+      </select>
       <Button type='submit' aria-disabled={isEmpty || undefined} className='shrink-0'>
         {I18N.SEARCH_BUTTON}
       </Button>

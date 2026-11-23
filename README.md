@@ -10,7 +10,7 @@ Your task is to build a payment search interface that allows users to:
 
 ## ✅ My Solution
 
-**Status:** Steps 1 (Basic Payment List), 2 (Search by Payment ID), 3 (Clear Filters), 4 (Handle Payment Not Found) and 5 (Handle Server Error) are done.
+**Status:** Steps 1 (Basic Payment List), 2 (Search by Payment ID), 3 (Clear Filters), 4 (Handle Payment Not Found), 5 (Handle Server Error) and 6 (Currency Filter) are done.
 
 **Live demo:** https://andreibtc84.github.io/payment-list-challenge-react/
 
@@ -29,6 +29,7 @@ npm run test:step2                         # run the graded Step 2 tests (watch 
 npm run test:step3                         # run the graded Step 3 test (watch mode)
 npm run test:step4                         # run the graded Step 4 test (watch mode)
 npm run test:step5                         # run the graded Step 5 test (watch mode)
+npm run test:step6                         # run the graded Step 6 tests (watch mode)
 npm run build                              # type-check and build for production
 ```
 
@@ -36,8 +37,8 @@ npm run build                              # type-check and build for production
 
 ### How it's built and why
 
-- Design decisions, each with the alternatives considered: [Step 1](docs/decisions/ADR-step1.md), [Step 2](docs/decisions/ADR-step2.md), [Step 3](docs/decisions/ADR-step3.md), [Step 4](docs/decisions/ADR-step4.md), [Step 5](docs/decisions/ADR-step5.md), and [general decisions](docs/decisions/ADR-general.md) across steps (such as the React Compiler).
-- Specs (what was planned, the tests, and a system diagram): [Step 1](docs/specs/step-1-basic-payment-list.md) ([diagram](docs/specs/step-1-system-design.svg)), [Step 2](docs/specs/step-2-search-by-payment-id.md) ([diagram](docs/specs/step-2-system-design.svg)), [Step 3](docs/specs/step-3-clear-filters.md) ([diagram](docs/specs/step-3-system-design.svg)), [Step 4](docs/specs/step-4-handle-payment-not-found.md) ([diagram](docs/specs/step-4-system-design.svg)), [Step 5](docs/specs/step-5-handle-server-error.md) ([diagram](docs/specs/step-5-system-design.svg)).
+- Design decisions, each with the alternatives considered: [Step 1](docs/decisions/ADR-step1.md), [Step 2](docs/decisions/ADR-step2.md), [Step 3](docs/decisions/ADR-step3.md), [Step 4](docs/decisions/ADR-step4.md), [Step 5](docs/decisions/ADR-step5.md), [Step 6](docs/decisions/ADR-step6.md), and [general decisions](docs/decisions/ADR-general.md) across steps (such as the React Compiler).
+- Specs (what was planned, the tests, and a system diagram): [Step 1](docs/specs/step-1-basic-payment-list.md) ([diagram](docs/specs/step-1-system-design.svg)), [Step 2](docs/specs/step-2-search-by-payment-id.md) ([diagram](docs/specs/step-2-system-design.svg)), [Step 3](docs/specs/step-3-clear-filters.md) ([diagram](docs/specs/step-3-system-design.svg)), [Step 4](docs/specs/step-4-handle-payment-not-found.md) ([diagram](docs/specs/step-4-system-design.svg)), [Step 5](docs/specs/step-5-handle-server-error.md) ([diagram](docs/specs/step-5-system-design.svg)), [Step 6](docs/specs/step-6-currency-filter.md) ([diagram](docs/specs/step-6-system-design.svg)).
 - **CI** (`.github/workflows/ci.yml`): lint, type-check, tests and build on every pull request and every push to `main`. A push to `main` deploys to GitHub Pages only after those checks pass.
 
 The original challenge brief continues below, unchanged.
