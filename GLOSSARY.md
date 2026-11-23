@@ -23,3 +23,9 @@
 **Applied filter**: Any filter currently driving the table, held in the URL. In Step 3 the only one is the Applied search; Currency joins it in Step 6. The Clear Filters button shows while at least one is applied.
 
 **Not-found message**: The "Payment not found." text (`I18N.PAYMENT_NOT_FOUND`) shown in place of the table when the payments API answers an Applied search with HTTP 404 (for example `pay_404`).
+
+**Server-error message**: The "Internal server error. Please try again later." text (`I18N.INTERNAL_SERVER_ERROR`) shown in place of the table when the payments API answers with HTTP 500 (for example `pay_500`).
+
+**Fallback message**: The "Something went wrong!" text (`I18N.SOMETHING_WENT_WRONG`) shown in place of the table for any other failed request: another HTTP status (such as 401), a network error, or an unexpected non-HTTP error.
+
+**Error message**: Any of the Not-found, Server-error or Fallback messages. Only one shows at a time, in the page's status region, in place of the table.

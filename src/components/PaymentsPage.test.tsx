@@ -650,47 +650,53 @@ describe('PaymentsPage clear filters', () => {
   })
 })
 
-describe('PaymentsPage payment not found', () => {
+// The mock API answers pay_404 with 404 (README Step 4), pay_500 with 500 (Step 5) and 401 with 401.
+// Every error message replaces the table and recovers the same way, so they share these tests.
+describe.each([
+  ['payment not found', 'pay_404', I18N.PAYMENT_NOT_FOUND],
+  ['server error', 'pay_500', I18N.INTERNAL_SERVER_ERROR],
+  ['other error', '401', I18N.SOMETHING_WENT_WRONG],
+])('PaymentsPage %s', (_case, paymentId, message) => {
   const [[, clickSearch], [, pressEnter]] = SUBMIT_WAYS
 
-  // Searches pay_404, the ID the mock API answers with 404 (README Step 4), and waits for the message.
-  const searchForMissingPayment = async (user: User, submit = clickSearch) => {
-    await user.type(getSearchbox(), 'pay_404')
+  // Searches the failing ID and waits for its message.
+  const searchForFailingPayment = async (user: User, submit = clickSearch) => {
+    await user.type(getSearchbox(), paymentId)
     await submit(user)
-    return screen.findByText(I18N.PAYMENT_NOT_FOUND)
+    return screen.findByText(message)
   }
 
   it.each(SUBMIT_WAYS)(
-    'should show the not-found message in an existing status region after %s',
+    'should show the message in an existing status region after %s',
     async (_way, submit) => {
       const user = userEvent.setup()
       await renderLoadedPage()
       // Live regions are announced only when their content changes, so the region must exist first.
       const status = screen.getByRole('status')
 
-      const message = await searchForMissingPayment(user, submit)
+      const shownMessage = await searchForFailingPayment(user, submit)
 
-      expect(status).toContainElement(message)
+      expect(status).toContainElement(shownMessage)
     },
   )
 
-  it('should hide the payments table when the payment is not found', async () => {
+  it('should hide the payments table', async () => {
     const user = userEvent.setup()
     await renderLoadedPage()
 
-    await searchForMissingPayment(user)
+    await searchForFailingPayment(user)
 
     expect(screen.queryByRole('table')).not.toBeInTheDocument()
   })
 
-  it('should keep the heading, the searched Payment ID and Clear Filters when the payment is not found', async () => {
+  it('should keep the heading, the searched Payment ID and Clear Filters', async () => {
     const user = userEvent.setup()
     await renderLoadedPage()
 
-    await searchForMissingPayment(user)
+    await searchForFailingPayment(user)
 
     expect(screen.getByRole('heading', { name: 'All payments' })).toBeInTheDocument()
-    expect(getSearchbox()).toHaveValue('pay_404')
+    expect(getSearchbox()).toHaveValue(paymentId)
     expect(getClearButton()).toBeInTheDocument()
   })
 
@@ -699,40 +705,40 @@ describe('PaymentsPage payment not found', () => {
     ['Search button', 'clicking Search', clickSearch, getSearchButton],
     ['search input', 'pressing Enter', pressEnter, getSearchbox],
   ])(
-    'should keep focus on the %s after %s when the payment is not found',
+    'should keep focus on the %s after %s',
     async (_focused, _way, submit, getFocused) => {
       const user = userEvent.setup()
       await renderLoadedPage()
 
-      await searchForMissingPayment(user, submit)
+      await searchForFailingPayment(user, submit)
 
       expect(getFocused()).toHaveFocus()
     },
   )
 
-  it('should show the not-found message when the page loads with ?search=pay_404', async () => {
-    window.history.replaceState(null, '', '/?search=pay_404')
+  it('should show the message when the page loads with the ID in the URL', async () => {
+    window.history.replaceState(null, '', `/?search=${paymentId}`)
     renderPage()
 
-    expect(await screen.findByText(I18N.PAYMENT_NOT_FOUND)).toBeInTheDocument()
+    expect(await screen.findByText(message)).toBeInTheDocument()
     expect(screen.queryByRole('table')).not.toBeInTheDocument()
   })
 
   it('should remove the message and show the first 5 Payments when Clear Filters is clicked', async () => {
     const user = userEvent.setup()
     await renderLoadedPage()
-    await searchForMissingPayment(user)
+    await searchForFailingPayment(user)
 
     await user.click(getClearButton())
 
     await waitForFirstPage()
-    expect(screen.queryByText(I18N.PAYMENT_NOT_FOUND)).not.toBeInTheDocument()
+    expect(screen.queryByText(message)).not.toBeInTheDocument()
   })
 
   it('should remove the message and show the Payment when a valid Payment ID is searched next', async () => {
     const user = userEvent.setup()
     await renderLoadedPage()
-    await searchForMissingPayment(user)
+    await searchForFailingPayment(user)
 
     await user.clear(getSearchbox())
     await user.type(getSearchbox(), 'pay_134_1')
@@ -740,22 +746,22 @@ describe('PaymentsPage payment not found', () => {
 
     await waitForSingleResult()
     expect(getDataRow(0)['Payment ID']).toBe('pay_134_1')
-    expect(screen.queryByText(I18N.PAYMENT_NOT_FOUND)).not.toBeInTheDocument()
+    expect(screen.queryByText(message)).not.toBeInTheDocument()
   })
 
   it('should restore the previous table on Back and show the message again on Forward', async () => {
     const user = userEvent.setup()
     await renderLoadedPage()
-    await searchForMissingPayment(user)
+    await searchForFailingPayment(user)
 
     act(() => window.history.back())
 
     await waitForFirstPage()
-    expect(screen.queryByText(I18N.PAYMENT_NOT_FOUND)).not.toBeInTheDocument()
+    expect(screen.queryByText(message)).not.toBeInTheDocument()
 
     act(() => window.history.forward())
 
-    expect(await screen.findByText(I18N.PAYMENT_NOT_FOUND)).toBeInTheDocument()
+    expect(await screen.findByText(message)).toBeInTheDocument()
     expect(screen.queryByRole('table')).not.toBeInTheDocument()
   })
 })

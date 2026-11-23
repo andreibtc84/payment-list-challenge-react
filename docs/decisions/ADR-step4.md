@@ -55,7 +55,7 @@ The architecture and code decisions behind Step 4.
 
 **Consequences.**
 - axios details stay in one module, and the mapping has its own fast unit tests.
-- The API module now imports the UI copy, and the message also decides whether the table shows. Both are worth revisiting when Step 5 adds a second error.
+- The API module now imports the UI copy, and the message also decides whether the table shows. Both are worth revisiting when Step 5 adds a second error. ([Step 5 decision 2](ADR-step5.md#2-keep-geterrormessage-and-give-it-a-status--message-map) settles both.)
 
 ## 4. The starter's error colours, with an icon, as wide as the input
 

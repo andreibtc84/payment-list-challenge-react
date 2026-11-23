@@ -14,18 +14,21 @@ const httpError = (status: number) =>
   } satisfies AxiosResponse)
 
 describe('getErrorMessage', () => {
-  it('should return the payment not found message for a 404 response', () => {
-    expect(getErrorMessage(httpError(404))).toBe(I18N.PAYMENT_NOT_FOUND)
+  it.each([
+    [I18N.PAYMENT_NOT_FOUND, 'a 404 response', httpError(404)],
+    [I18N.INTERNAL_SERVER_ERROR, 'a 500 response', httpError(500)],
+    [I18N.SOMETHING_WENT_WRONG, 'a 401 response', httpError(401)],
+    [
+      I18N.SOMETHING_WENT_WRONG,
+      'a network error (no response)',
+      new AxiosError('Network Error', AxiosError.ERR_NETWORK),
+    ],
+    [I18N.SOMETHING_WENT_WRONG, 'a non-axios error', new Error('boom')],
+  ])('should return %j for %s', (expected, _case, error) => {
+    expect(getErrorMessage(error)).toBe(expected)
   })
 
-  // Only 404 has a message in Step 4; everything else stays unmapped.
-  it.each([
-    ['a 500 response', httpError(500)],
-    ['a 401 response', httpError(401)],
-    ['a network error (no response)', new AxiosError('Network Error', AxiosError.ERR_NETWORK)],
-    ['a non-axios error', new Error('boom')],
-    ['no error', null],
-  ])('should return no message for %s', (_case, error) => {
-    expect(getErrorMessage(error)).toBeUndefined()
+  it('should return no message when there is no error', () => {
+    expect(getErrorMessage(null)).toBeUndefined()
   })
 })

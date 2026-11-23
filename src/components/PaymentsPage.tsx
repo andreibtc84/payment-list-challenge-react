@@ -71,7 +71,7 @@ export const PaymentsPage = () => {
         onClear={hasAppliedFilters ? () => setFilters({ search: '' }) : undefined}
       />
       {/* Always rendered: a live region must exist before its text changes to be announced.
-          One region for loading and the not-found message; they never show at the same time. */}
+          One region for loading and any error message; they never show at the same time. */}
       <div role='status' aria-live='polite'>
         {/* Not isFetching: that would also announce silent background refetches. */}
         <span className='sr-only'>
