@@ -107,6 +107,8 @@ The architecture and code decisions behind Step 6.
 - A separate `ui/field.ts` for the constant. Neutral, but a file for one string.
 - A shadcn/Radix `Select`. It's a custom listbox with more code and more accessibility surface than a native select.
 
+**Update in Step 7.** The select now turns off the native arrow and draws its own chevron, and the width moved to a wrapper around it. See [Step 7 decisions](ADR-step7.md#4-the-currency-select-draws-its-own-chevron).
+
 **Consequences.**
 - One place to change field styling.
 - Checked in Chrome: axe found no violations, the select is 128×36, the focus outline is 9.1:1 and still shows in forced colours, and nothing scrolls sideways at 320px.
@@ -122,4 +124,4 @@ The architecture and code decisions behind Step 6.
 
 **Consequences.**
 - Untested behaviour ships for one step.
-- When no payment matches both filters, the mock answers 404 and the page shows "Payment not found.". Whether that wording fits is a Step 7 question.
+- When no payment matches both filters, the mock answers 404 and the page shows "Payment not found.". Whether that wording fits is a Step 7 question. (Step 7 tested the combination and kept the wording: see [Step 7 decisions](ADR-step7.md).)

@@ -75,23 +75,39 @@ export const SearchForm = ({
         {I18N.CURRENCY_FILTER_LABEL}
       </label>
       {/* Controlled from the URL, so Back/Forward update it; a choice applies at once (no draft). */}
-      <select
-        id={CURRENCY_ID}
-        // About the screenshot's width from sm up; full width when the controls stack on phones.
-        className={cn(fieldClassName, 'sm:w-32')}
-        value={currency}
-        onChange={(event) => {
-          const { value } = event.target
-          onCurrencyChange(isCurrency(value) ? value : '')
-        }}
-      >
-        <option value=''>{I18N.CURRENCIES_OPTION}</option>
-        {CURRENCIES.map((currency) => (
-          <option key={currency} value={currency}>
-            {currency}
-          </option>
-        ))}
-      </select>
+      {/* Screenshot's width from sm up; full width on phones. */}
+      <div className='relative w-full sm:w-32'>
+        <select
+          id={CURRENCY_ID}
+          // Native arrow off: its inset differs per browser. pr-8 clears our chevron.
+          className={cn(fieldClassName, 'appearance-none pr-8')}
+          value={currency}
+          onChange={(event) => {
+            const { value } = event.target
+            onCurrencyChange(isCurrency(value) ? value : '')
+          }}
+        >
+          <option value=''>{I18N.CURRENCIES_OPTION}</option>
+          {CURRENCIES.map((currency) => (
+            <option key={currency} value={currency}>
+              {currency}
+            </option>
+          ))}
+        </select>
+        {/* currentColor keeps it visible in forced colours. */}
+        <svg
+          aria-hidden='true'
+          viewBox='0 0 16 16'
+          fill='none'
+          stroke='currentColor'
+          strokeWidth='1.5'
+          strokeLinecap='round'
+          strokeLinejoin='round'
+          className='pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2'
+        >
+          <path d='m4 6 4 4 4-4' />
+        </svg>
+      </div>
       <Button type='submit' aria-disabled={isEmpty || undefined} className='shrink-0'>
         {I18N.SEARCH_BUTTON}
       </Button>

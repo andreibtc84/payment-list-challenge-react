@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { http, HttpResponse } from 'msw'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
-import { API_URL } from '../constants'
+import { API_URL, type Currency } from '../constants'
 import { I18N } from '../constants/i18n'
 import { mockPayments134 } from '../mocks/mockPaymentsData'
 import { server } from '../mocks/node'
@@ -73,6 +73,10 @@ const getDataRow = (index: number) =>
     ]),
   )
 
+// Data rows as { [column header]: cell text }.
+const getDataRows = () =>
+  screen.getAllByRole('row').slice(1).map((_, index) => getDataRow(index))
+
 type User = ReturnType<typeof userEvent.setup>
 
 // The two ways to submit a search; shared so every submit test covers both the same way.
@@ -116,6 +120,12 @@ const waitForSingleResult = () =>
 // Waits for the unfiltered first page: 1 header row + 5 payments.
 const waitForFirstPage = () =>
   waitFor(() => expect(screen.getAllByRole('row')).toHaveLength(6))
+
+// Waits for exactly these Payment IDs, in order.
+const waitForPaymentIds = (ids: string[]) =>
+  waitFor(() =>
+    expect(getDataRows().map((row) => row[I18N.TABLE_HEADER_PAYMENT_ID])).toEqual(ids),
+  )
 
 // Single release path for the held response; afterEach calls it too, so a test that fails
 // before releasing leaves no pending response.
@@ -685,14 +695,19 @@ describe('PaymentsPage clear filters', () => {
     ).toBeInTheDocument()
   })
 
+  // Mock data: pay_134_2 is the only pay_134 Payment in EUR.
   it.each([
-    ['only a Currency filter', '/base/?currency=EUR&view=compact'],
-    ['a Currency filter and a search', '/base/?search=pay_134&currency=EUR&view=compact'],
-  ])('should reset every filter in one history entry when Clear Filters is clicked with %s', async (_name, url) => {
+    [
+      'only a Currency filter',
+      '/base/?currency=EUR&view=compact',
+      ['pay_134_2', 'pay_456_2', 'pay_456_5', 'pay_456_10', 'pay_789_1'],
+    ],
+    ['a Currency filter and a search', '/base/?search=pay_134&currency=EUR&view=compact', ['pay_134_2']],
+  ])('should reset every filter in one history entry when Clear Filters is clicked with %s', async (_name, url, filteredIds) => {
     window.history.replaceState(null, '', url)
     const user = userEvent.setup()
     renderPage()
-    // No wait for results: the search + currency case would be a Step 7 claim; only clearing is checked.
+    await waitForPaymentIds(filteredIds)
     const entries = window.history.length
 
     await user.click(getClearButton())
@@ -703,7 +718,7 @@ describe('PaymentsPage clear filters', () => {
     expect(window.location.search).toBe('?view=compact')
     expect(window.history.length).toBe(entries + 1)
     expect(queryClearButton()).not.toBeInTheDocument()
-    await waitForFirstPage()
+    await waitForPaymentIds(['pay_134_1', 'pay_134_2', 'pay_134_3', 'pay_134_4', 'pay_134_5'])
     expect(document.activeElement).toBe(getSearchbox())
   })
 })
@@ -829,9 +844,9 @@ describe('PaymentsPage currency filter', () => {
   // so one matching row wouldn't prove the filter.
   const waitForOnlyCurrency = (currency: string) =>
     waitFor(() => {
-      const rows = screen.getAllByRole('row').slice(1)
+      const rows = getDataRows()
       expect(rows.length).toBeGreaterThan(0)
-      rows.forEach((_, index) => expect(getDataRow(index).Currency).toBe(currency))
+      rows.forEach((row) => expect(row.Currency).toBe(currency))
     })
 
   it('should show a currency select named "Filter by currency" inside the search landmark', async () => {
@@ -994,5 +1009,134 @@ describe('PaymentsPage currency filter', () => {
 
     expect(window.history.length).toBe(entries)
     expect(window.location.search).toBe('?currency=EUR')
+  })
+})
+
+describe('PaymentsPage combined filters', () => {
+  // Mock data: 6 pay_205 Payments are in USD; the page shows 5.
+  const PAY_205_USD_FIRST_PAGE = ['pay_205_1', 'pay_205_3', 'pay_205_5', 'pay_205_6', 'pay_205_12']
+
+  const searchThenChooseCurrency = async (user: User, paymentId: string, currency: Currency) => {
+    await user.type(getSearchbox(), paymentId)
+    await user.click(getSearchButton())
+    await user.selectOptions(getCurrencySelect(), currency)
+  }
+
+  const chooseCurrencyThenSearch = async (user: User, paymentId: string, currency: Currency) => {
+    await user.selectOptions(getCurrencySelect(), currency)
+    await user.type(getSearchbox(), paymentId)
+    await user.click(getSearchButton())
+  }
+
+  // Loads ?search=pay_134&currency=USD and waits for its one match.
+  const renderWithBothInUrl = async () => {
+    window.history.replaceState(null, '', '/?search=pay_134&currency=USD')
+    renderPage()
+    await waitForPaymentIds(['pay_134_1'])
+  }
+
+  // The IDs imply the currency only via the mock data, so check the cells.
+  const expectEveryRowIn = (currency: Currency) =>
+    getDataRows().forEach((row) => expect(row.Currency).toBe(currency))
+
+  // A filter left out must be absent (toEqual ignores undefined).
+  const expectLastRequestFilters = (
+    requestedUrls: URL[],
+    expected: { search?: string; currency?: Currency },
+  ) => {
+    const sent = requestedUrls.at(-1)?.searchParams
+    expect({
+      search: sent?.get('search') ?? undefined,
+      currency: sent?.get('currency') ?? undefined,
+    }).toEqual(expected)
+  }
+
+  it.each<[string, (user: User) => Promise<void>]>([
+    [
+      'searching first, then choosing the currency',
+      (user) => searchThenChooseCurrency(user, 'pay_134', 'USD'),
+    ],
+    [
+      'choosing the currency first, then searching',
+      (user) => chooseCurrencyThenSearch(user, 'pay_134', 'USD'),
+    ],
+  ])('should show only Payments matching both the search and the currency, send both and keep both in the URL, when %s', async (_order, applyBoth) => {
+    const user = userEvent.setup()
+    await renderLoadedPage()
+    const requestedUrls = captureRequests()
+
+    await applyBoth(user)
+
+    await waitForPaymentIds(['pay_134_1'])
+    expectEveryRowIn('USD')
+    expectLastRequestFilters(requestedUrls, { search: 'pay_134', currency: 'USD' })
+    const inUrl = new URLSearchParams(window.location.search)
+    expect(inUrl.get('search')).toBe('pay_134')
+    expect(inUrl.get('currency')).toBe('USD')
+  })
+
+  it('should send both filters and show only the matching Payments and both values in the controls when the page loads with both filters in the URL', async () => {
+    const requestedUrls = captureRequests()
+
+    await renderWithBothInUrl()
+
+    expectEveryRowIn('USD')
+    expectLastRequestFilters(requestedUrls, { search: 'pay_134', currency: 'USD' })
+    expect(getSearchbox()).toHaveValue('pay_134')
+    expect(getCurrencySelect()).toHaveDisplayValue('USD')
+  })
+
+  it('should show only the first 5 matching Payments when more than 5 match both filters', async () => {
+    const user = userEvent.setup()
+    await renderLoadedPage()
+
+    await searchThenChooseCurrency(user, 'pay_205', 'USD')
+
+    await waitForPaymentIds(PAY_205_USD_FIRST_PAGE)
+    expectEveryRowIn('USD')
+  })
+
+  it('should keep the search and drop only the currency when "Currencies" is chosen', async () => {
+    const user = userEvent.setup()
+    await renderWithBothInUrl()
+    const requestedUrls = captureRequests()
+
+    await user.selectOptions(getCurrencySelect(), I18N.CURRENCIES_OPTION)
+
+    await waitForPaymentIds(['pay_134_1', 'pay_134_2', 'pay_134_3', 'pay_134_4', 'pay_134_5'])
+    expectLastRequestFilters(requestedUrls, { search: 'pay_134' })
+    expect(window.location.search).toBe('?search=pay_134')
+    expect(getSearchbox()).toHaveValue('pay_134')
+  })
+
+  it('should keep the currency when a new search is applied', async () => {
+    const user = userEvent.setup()
+    await renderWithBothInUrl()
+    const requestedUrls = captureRequests()
+
+    await user.clear(getSearchbox())
+    await user.type(getSearchbox(), 'pay_205')
+    await user.click(getSearchButton())
+
+    await waitForPaymentIds(PAY_205_USD_FIRST_PAGE)
+    expectEveryRowIn('USD')
+    expectLastRequestFilters(requestedUrls, { search: 'pay_205', currency: 'USD' })
+    expect(new URLSearchParams(window.location.search).get('currency')).toBe('USD')
+    expect(getCurrencySelect()).toHaveDisplayValue('USD')
+  })
+
+  // No pay_134 Payment is in ZAR, so the mock answers 404.
+  it('should show the Not-found message in place of the table, keeping both filters, when nothing matches both', async () => {
+    const user = userEvent.setup()
+    await renderLoadedPage()
+
+    await searchThenChooseCurrency(user, 'pay_134', 'ZAR')
+
+    expect(await screen.findByText(I18N.PAYMENT_NOT_FOUND)).toBeInTheDocument()
+    expect(screen.queryByRole('table')).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: I18N.PAGE_TITLE })).toBeInTheDocument()
+    expect(getSearchbox()).toHaveValue('pay_134')
+    expect(getCurrencySelect()).toHaveDisplayValue('ZAR')
+    expect(getClearButton()).toBeInTheDocument()
   })
 })
