@@ -21,7 +21,7 @@ function App() {
           <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
             <h1 className="flex items-center gap-3 text-3xl font-bold text-gray-900">
               {/* Decorative: the heading text already names the brand. */}
-              <img src="/favicon.png" alt="" className="h-9 w-9" />
+              <img src="favicon.png" alt="" className="h-9 w-9" />
               {I18N.APP_TITLE}
             </h1>
           </div>
