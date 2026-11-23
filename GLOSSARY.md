@@ -39,3 +39,13 @@
 **Total pages**: `ceil(total / pageSize)`, from the payments API response. Next is disabled when the Current page is at or past it.
 
 **Pagination controls**: The Previous button, the "Page N" label and the Next button, in the table card's footer, inside a navigation landmark named "Pagination".
+
+**Telemetry event**: A structured record of something that happened in the browser: `{ event, level, timestamp, …shared context, …fields }`. `event` is a name from a fixed list; `level` is `info`, `warn` or `error`.
+
+**Sink**: Where Telemetry events go. The default sink logs each event to the browser console at its level; tests swap in a spy.
+
+**Shared context**: The fields every Telemetry event carries: app version, environment, a per-page-load session ID and the path without the query string.
+
+**Core Web Vitals**: LCP (loading), INP (responsiveness) and CLS (visual stability), plus FCP and TTFB as supporting metrics, measured in the visitor's browser by `web-vitals`.
+
+**Crash fallback**: The "Something went wrong!" alert shown in place of the payments area when rendering throws. Same text as the Fallback message, but a different state: the page failed to render, not a request.

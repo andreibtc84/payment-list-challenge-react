@@ -2,11 +2,12 @@ import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { http, HttpResponse } from 'msw'
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { API_URL, type Currency } from '../constants'
 import { I18N } from '../constants/i18n'
 import { mockPayments123, mockPayments134, mockPayments456 } from '../mocks/mockPaymentsData'
 import { server } from '../mocks/node'
+import { setTelemetrySink, type TelemetryEvent } from '../lib/telemetry'
 import type { Payment, PaymentSearchResponse, PaymentStatus } from '../types/payment'
 import { PaymentsPage } from './PaymentsPage'
 
@@ -1442,5 +1443,129 @@ describe('PaymentsPage pagination', () => {
     await screen.findByText(`${I18N.PAGE_LABEL} 5`)
     await waitForPaymentIds(PAGE_5_IDS)
     expect(window.location.search).toBe('?page=5')
+  })
+})
+
+describe('PaymentsPage telemetry', () => {
+  // Collects every event for the rest of this test.
+  const captureEvents = () => {
+    const sink = vi.fn<(event: TelemetryEvent) => void>()
+    setTelemetrySink(sink)
+    return () => sink.mock.calls.map(([event]) => event)
+  }
+  const fetchEvents = (events: TelemetryEvent[]) =>
+    events.filter((event) => event.event.startsWith('payments_fetch_'))
+  const actionEvents = (events: TelemetryEvent[]) =>
+    events.filter((event) => !event.event.startsWith('payments_fetch_'))
+
+  it('should log one successful fetch when the page loads', async () => {
+    const events = captureEvents()
+
+    await renderLoadedPage()
+
+    expect(fetchEvents(events())).toEqual([
+      expect.objectContaining({
+        event: 'payments_fetch_succeeded',
+        outcome: 'success',
+        page: 1,
+        pageSize: 5,
+        hasSearch: false,
+      }),
+    ])
+  })
+
+  it('should log a failed 404 fetch while the page shows the not-found message', async () => {
+    const user = userEvent.setup()
+    await renderLoadedPage()
+    const events = captureEvents()
+
+    await user.type(getSearchbox(), 'pay_404')
+    await user.click(getSearchButton())
+
+    expect(await screen.findByText(I18N.PAYMENT_NOT_FOUND)).toBeInTheDocument()
+    expect(fetchEvents(events())).toEqual([
+      expect.objectContaining({
+        event: 'payments_fetch_failed',
+        level: 'warn',
+        status: 404,
+        hasSearch: true,
+      }),
+    ])
+  })
+
+  it('should never log the search term or the query string', async () => {
+    const user = userEvent.setup()
+    const events = captureEvents()
+    await renderLoadedPage()
+
+    await user.type(getSearchbox(), 'pay_134')
+    await user.click(getSearchButton())
+    await user.selectOptions(getCurrencySelect(), 'USD')
+    await waitFor(() =>
+      expect(fetchEvents(events())).toContainEqual(
+        expect.objectContaining({ hasSearch: true, currency: 'USD' }),
+      ),
+    )
+
+    const logged = JSON.stringify(events())
+    expect(logged).not.toContain('pay_134')
+    expect(logged).not.toContain('search=')
+  })
+
+  // One event per action, never with the search term.
+  it.each<[string, (user: User) => Promise<void>, Record<string, unknown>]>([
+    [
+      'a search',
+      async (user) => {
+        await user.type(getSearchbox(), 'pay_134')
+        await user.click(getSearchButton())
+      },
+      { event: 'search_submitted', hasSearch: true },
+    ],
+    [
+      'a currency choice',
+      (user) => user.selectOptions(getCurrencySelect(), 'EUR'),
+      { event: 'currency_changed', currency: 'EUR' },
+    ],
+    [
+      'Clear Filters',
+      async (user) => {
+        await user.selectOptions(getCurrencySelect(), 'EUR')
+        await user.click(getClearButton())
+      },
+      { event: 'filters_cleared' },
+    ],
+    [
+      'Next page',
+      (user) => user.click(screen.getByRole('button', { name: I18N.NEXT_BUTTON })),
+      { event: 'page_changed', page: 2 },
+    ],
+  ])('should log %s as one info event', async (_case, perform, expected) => {
+    const user = userEvent.setup()
+    await renderLoadedPage()
+    const events = captureEvents()
+
+    await perform(user)
+
+    const logged = actionEvents(events())
+    expect(logged.at(-1)).toEqual(expect.objectContaining({ ...expected, level: 'info' }))
+    expect(logged.filter((event) => event.event === expected.event)).toHaveLength(1)
+    expect(JSON.stringify(logged)).not.toContain('pay_134')
+  })
+
+  // Its own test: Previous needs page 2 first.
+  it('should log Previous page as one info event', async () => {
+    const user = userEvent.setup()
+    await renderLoadedPage()
+    await user.click(screen.getByRole('button', { name: I18N.NEXT_BUTTON }))
+    const previous = screen.getByRole('button', { name: I18N.PREVIOUS_BUTTON })
+    await waitFor(() => expect(previous).toBeEnabled())
+    const events = captureEvents()
+
+    await user.click(previous)
+
+    expect(actionEvents(events())).toEqual([
+      expect.objectContaining({ event: 'page_changed', level: 'info', page: 1 }),
+    ])
   })
 })

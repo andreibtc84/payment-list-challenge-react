@@ -1,0 +1,160 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1110 700" width="1110" height="700" role="img" aria-labelledby="title desc" font-family="system-ui, -apple-system, Segoe UI, Roboto, sans-serif">
+  <title id="title">System design with observability</title>
+  <desc id="desc">The system after Step 8, plus observability. In the browser, main.tsx starts the MSW worker in development, or in the GitHub Pages build, and renders App, which provides the TanStack Query client. App renders PaymentsPage. PaymentsPage reads the applied filters, the Payment ID search and the currency, and the current page from usePaymentFilters, which reads the browser URL's ?search=, ?currency= and ?page= with useSyncExternalStore, keeps a currency only if it is one of the listed codes, reads a page that is not a positive whole number as page 1, and follows Back and Forward through popstate. It returns the state, setFilters and a separate setPage. setFilters writes the filters with history.pushState from one key list and drops the page. setPage writes ?page= with pushState, or with replaceState when asked to replace, and writes no param for page 1. PaymentsPage renders SearchForm, passing onSearch, onCurrencyChange, and onClear only while a filter is applied. SearchForm holds the typed draft and a native currency select named Filter by currency; all its callbacks call setFilters. PaymentsPage also uses lib/format and the ui components Table, Badge, Skeleton, Button and Input, and calls usePayments, a useQuery hook with keepPreviousData, which calls fetchPayments in api/payments, which sends GET /api/payments with page, pageSize, and search and currency only when they are set. The current page is the page sent in the request. PaymentsPage works out total pages from the response and renders the new Pagination component in the footer of the table card, after the table and only when there is a response. Pagination is a navigation landmark named Pagination with a Previous button, a polite live Page N label and a Next button, moves focus to the other button when the pressed one becomes disabled, and calls onPageChange, which is setPage. When a response shows the current page is past the last page, PaymentsPage calls setPage with page 1 and replace, so the page param is removed with replaceState. When the query fails, PaymentsPage passes the error to getErrorMessage in api/payments, which maps 404 to the Payment not found message, 500 to the Internal server error message, and any other failure to Something went wrong, shown in the always-rendered status region in place of the table. In the browser the MSW service worker answers from the mock handlers, which apply search and currency together, slice the result by page and pageSize, return 404 when nothing matches both, and return 404 for pay_404, 500 for pay_500 and 401 for 401. In tests, Vitest with jsdom in UTC runs a setup file that loads the jest-dom matchers and resets the URL after every test. PaymentsPage.test renders PaymentsPage and drives it with user-event against the MSW Node server, which uses the same mock handlers, and checks the filters, the URL, history, paging, the resets, bad and past-the-end pages, and the request params. Pagination.test renders Pagination alone. usePaymentFilters.test tests the hook, including page parsing and the resets, format.test unit-tests lib/format, and payments.test unit-tests getErrorMessage. New: observability. lib/telemetry has one track function that adds a timestamp, the app version, environment, a per-load session ID and the path without the query, and sends each event to a swappable sink, which logs it to the browser console. Events come from fetchPayments (duration, outcome, status), the PaymentsPage handlers (search, currency, clear, page; never the search term), an ErrorBoundary around PaymentsPage that shows Something went wrong, the React root error handlers, window error and unhandledrejection listeners, and web-vitals (LCP, INP, CLS, FCP, TTFB with attribution). In tests the setup file installs a silent sink, and telemetry.test, webVitals.test, ErrorBoundary.test, payments.test and PaymentsPage.test check the events.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#374151"/>
+    </marker>
+    <style>
+      .group { fill: #f9fafb; stroke: #9ca3af; stroke-width: 1.5; stroke-dasharray: 6 4; }
+      .group-label { fill: #374151; font-size: 14px; font-weight: 600; }
+      .node { fill: #ffffff; stroke: #374151; stroke-width: 1.5; }
+      .new { fill: #eff6ff; stroke: #1d4ed8; stroke-width: 2; }
+      .mock { fill: #fef3c7; stroke: #92400e; stroke-width: 1.5; }
+      .name { fill: #111827; font-size: 15px; font-weight: 600; }
+      .detail { fill: #374151; font-size: 12px; }
+      .edge { fill: none; stroke: #374151; stroke-width: 1.5; marker-end: url(#arrow); }
+      .edge2 { fill: none; stroke: #374151; stroke-width: 1.5; marker-start: url(#arrow); marker-end: url(#arrow); }
+      .edge-label { fill: #374151; font-size: 12px; font-style: italic; }
+      .legend { fill: #374151; font-size: 12px; }
+      .extra { fill: #f5f3ff; stroke: #6d28d9; stroke-width: 2; stroke-dasharray: 5 3; }
+    </style>
+  </defs>
+
+  <!-- Background, so the diagram reads the same on light and dark pages. -->
+  <rect width="1110" height="700" fill="#ffffff"/>
+
+  <!-- Browser -->
+  <rect class="group" x="20" y="20" width="1070" height="380" rx="10"/>
+  <text class="group-label" x="36" y="44">Browser: Vite dev server, or the GitHub Pages build</text>
+
+  <rect class="node" x="40" y="60" width="190" height="50" rx="6"/>
+  <text class="name" x="135" y="81" text-anchor="middle">main.tsx</text>
+  <text class="detail" x="135" y="99" text-anchor="middle">starts MSW: dev or Pages build</text>
+
+  <rect class="node" x="250" y="60" width="190" height="50" rx="6"/>
+  <text class="name" x="345" y="81" text-anchor="middle">App</text>
+  <text class="detail" x="345" y="99" text-anchor="middle">QueryClientProvider</text>
+
+  <rect class="node" x="460" y="60" width="190" height="50" rx="6"/>
+  <text class="name" x="555" y="81" text-anchor="middle">PaymentsPage</text>
+  <text class="detail" x="555" y="99" text-anchor="middle">page in request, redirect</text>
+
+  <rect class="node" x="670" y="60" width="190" height="50" rx="6"/>
+  <text class="name" x="765" y="81" text-anchor="middle">usePayments</text>
+  <text class="detail" x="765" y="99" text-anchor="middle">useQuery + keepPreviousData</text>
+
+  <rect class="node" x="880" y="60" width="190" height="64" rx="6"/>
+  <text class="name" x="975" y="81" text-anchor="middle">api/payments</text>
+  <text class="detail" x="975" y="99" text-anchor="middle">fetchPayments: GET, page, filters</text>
+  <text class="detail" x="975" y="115" text-anchor="middle">getErrorMessage: status → text</text>
+
+  <rect class="node" x="250" y="190" width="190" height="64" rx="6"/>
+  <text class="name" x="345" y="211" text-anchor="middle">SearchForm</text>
+  <text class="detail" x="345" y="229" text-anchor="middle">draft, currency select,</text>
+  <text class="detail" x="345" y="245" text-anchor="middle">Search, Clear Filters</text>
+
+  <rect class="node" x="460" y="190" width="190" height="80" rx="6"/>
+  <text class="name" x="555" y="211" text-anchor="middle">Pagination</text>
+  <text class="detail" x="555" y="229" text-anchor="middle">nav landmark, Previous,</text>
+  <text class="detail" x="555" y="245" text-anchor="middle">live Page N, Next, focus move</text>
+  <text class="detail" x="555" y="261" text-anchor="middle">in the card footer</text>
+
+  <rect class="node" x="670" y="190" width="190" height="80" rx="6"/>
+  <text class="name" x="765" y="211" text-anchor="middle">ui + lib/format</text>
+  <text class="detail" x="765" y="229" text-anchor="middle">Table, Badge, Skeleton, Button,</text>
+  <text class="detail" x="765" y="245" text-anchor="middle">Input, field classes; amount</text>
+  <text class="detail" x="765" y="261" text-anchor="middle">and date formatting</text>
+
+  <rect class="mock" x="880" y="190" width="190" height="50" rx="6"/>
+  <text class="name" x="975" y="211" text-anchor="middle">MSW service worker</text>
+  <text class="detail" x="975" y="229" text-anchor="middle">answers in the browser</text>
+
+  <rect class="node" x="250" y="310" width="190" height="60" rx="6"/>
+  <text class="name" x="345" y="331" text-anchor="middle">usePaymentFilters</text>
+  <text class="detail" x="345" y="349" text-anchor="middle">useSyncExternalStore,</text>
+  <text class="detail" x="345" y="363" text-anchor="middle">filters + page, setPage</text>
+
+  <rect class="node" x="40" y="310" width="170" height="60" rx="6"/>
+  <text class="name" x="125" y="331" text-anchor="middle">Browser URL</text>
+  <text class="detail" x="125" y="349" text-anchor="middle">?search= &amp;currency= &amp;page=</text>
+  <text class="detail" x="125" y="363" text-anchor="middle">push · replace · popstate</text>
+
+  <!-- Extra, across all steps: observability -->
+  <rect class="extra" x="782" y="286" width="176" height="104" rx="6"/>
+  <text class="name" x="870" y="306" text-anchor="middle">lib/telemetry</text>
+  <text class="detail" x="870" y="324" text-anchor="middle">track() → console sink</text>
+  <text class="detail" x="870" y="340" text-anchor="middle">fetches, page actions,</text>
+  <text class="detail" x="870" y="356" text-anchor="middle">ErrorBoundary, root and</text>
+  <text class="detail" x="870" y="372" text-anchor="middle">window errors, web-vitals</text>
+
+  <!-- Tests -->
+  <rect class="group" x="20" y="440" width="850" height="230" rx="10"/>
+  <text class="group-label" x="250" y="568">Tests: Vitest, jsdom, TZ=UTC</text>
+  <text class="detail" x="250" y="586">src/test/setup.ts: jest-dom matchers,</text>
+  <text class="detail" x="250" y="602">and a URL reset after each test</text>
+
+  <rect class="node" x="40" y="480" width="190" height="50" rx="6"/>
+  <text class="name" x="135" y="501" text-anchor="middle">PaymentsPage.test</text>
+  <text class="detail" x="135" y="519" text-anchor="middle">renders the page + mock server</text>
+
+  <rect class="node" x="250" y="480" width="190" height="50" rx="6"/>
+  <text class="name" x="345" y="501" text-anchor="middle">usePaymentFilters.test</text>
+  <text class="detail" x="345" y="519" text-anchor="middle">+ page parsing, resets</text>
+
+  <rect class="node" x="670" y="480" width="190" height="50" rx="6"/>
+  <text class="name" x="765" y="501" text-anchor="middle">format.test</text>
+  <text class="detail" x="765" y="519" text-anchor="middle">unit seam</text>
+
+  <rect class="mock" x="40" y="600" width="190" height="50" rx="6"/>
+  <text class="name" x="135" y="621" text-anchor="middle">MSW Node server</text>
+  <text class="detail" x="135" y="639" text-anchor="middle">answers in tests</text>
+
+  <!-- Shared mock data -->
+  <rect class="mock" x="880" y="600" width="190" height="50" rx="6"/>
+  <text class="name" x="975" y="621" text-anchor="middle">mocks/handlers</text>
+  <text class="detail" x="975" y="639" text-anchor="middle">search AND currency; error IDs</text>
+
+  <rect class="node" x="460" y="480" width="190" height="50" rx="6"/>
+  <text class="name" x="555" y="501" text-anchor="middle">Pagination.test</text>
+  <text class="detail" x="555" y="519" text-anchor="middle">component alone, no network</text>
+  <path class="edge" d="M640,480 V272"/>
+
+  <rect class="node" x="670" y="540" width="190" height="50" rx="6"/>
+  <text class="name" x="765" y="561" text-anchor="middle">payments.test</text>
+  <text class="detail" x="765" y="579" text-anchor="middle">getErrorMessage cases</text>
+
+  <!-- Legend -->
+  <rect class="extra" x="40" y="452" width="18" height="14" rx="3"/>
+  <text class="legend" x="66" y="464">New: observability</text>
+
+  <!-- Runtime edges -->
+  <path class="edge" d="M230,85 H248"/>
+  <path class="edge" d="M440,85 H458"/>
+  <path class="edge" d="M650,85 H668"/>
+  <path class="edge" d="M860,85 H878"/>
+  <path class="edge" d="M480,110 L410,188"/>
+  <text class="edge-label" x="372" y="160">renders</text>
+  <path class="edge" d="M555,110 V188"/>
+  <path class="edge" d="M630,110 L700,188"/>
+  <path class="edge" d="M500,270 V355 H442"/>
+  <text class="edge-label" x="492" y="300" text-anchor="end">onPageChange → setPage</text>
+  <path class="edge" d="M345,254 V308"/>
+  <text class="edge-label" x="338" y="276" text-anchor="end">onSearch / onCurrencyChange</text>
+  <text class="edge-label" x="338" y="292" text-anchor="end">/ onClear → setFilters</text>
+  <path class="edge2" d="M248,340 H212"/>
+  <path class="edge" d="M975,124 V188"/>
+  <text class="edge-label" x="985" y="144">?search=</text>
+  <text class="edge-label" x="985" y="160">&amp;currency=</text>
+  <text class="edge-label" x="985" y="176">&amp;page=</text>
+  <path class="edge" d="M975,240 V598"/>
+
+  <path class="edge" d="M600,60 V50 H960 V58"/>
+  <text class="edge-label" x="780" y="45" text-anchor="middle">error → getErrorMessage → message</text>
+
+  <!-- Test edges -->
+    <path class="edge" d="M345,480 V372"/>
+  <path class="edge" d="M765,480 V272"/>
+  <path class="edge" d="M135,530 V598"/>
+  <path class="edge" d="M230,625 H878"/>
+  </svg>

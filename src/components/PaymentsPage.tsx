@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { getErrorMessage } from '../api/payments'
+import { track } from '../lib/telemetry'
 import { PAGE_SIZE } from '../constants'
 import { I18N } from '../constants/i18n'
 import { usePaymentFilters } from '../hooks/usePaymentFilters'
@@ -78,11 +79,23 @@ export const PaymentsPage = () => {
       <SearchForm
         term={filters.search}
         currency={filters.currency}
-        onSearch={(search) => setFilters({ search })}
-        onCurrencyChange={(currency) => setFilters({ currency })}
+        // One event per user action; never the search term itself.
+        onSearch={(search) => {
+          track('search_submitted', 'info', { hasSearch: search.trim() !== '' })
+          setFilters({ search })
+        }}
+        onCurrencyChange={(currency) => {
+          track('currency_changed', 'info', { currency })
+          setFilters({ currency })
+        }}
         // One call clears both, so Clear Filters is a single Back step.
         onClear={
-          hasAppliedFilters ? () => setFilters({ search: '', currency: '' }) : undefined
+          hasAppliedFilters
+            ? () => {
+                track('filters_cleared', 'info')
+                setFilters({ search: '', currency: '' })
+              }
+            : undefined
         }
       />
       {/* Always rendered: a live region must exist before its text changes to be announced.
@@ -188,7 +201,10 @@ export const PaymentsPage = () => {
             <Pagination
               page={data.page}
               totalPages={totalPages}
-              onPageChange={setPage}
+              onPageChange={(page) => {
+                track('page_changed', 'info', { page })
+                setPage(page)
+              }}
             />
           )}
         </div>
