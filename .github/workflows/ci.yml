@@ -42,7 +42,7 @@ jobs:
 
       # Graded tests for finished steps only; the filter widens as each step is finished.
       - name: Test (graded, finished steps)
-        run: npx vitest run src/App.test.tsx -t "Step 1:|Step 2:|Step 3:|Step 4:"
+        run: npx vitest run src/App.test.tsx -t "Step 1:|Step 2:|Step 3:|Step 4:|Step 5:"
 
       - name: Build
         run: npx vite build

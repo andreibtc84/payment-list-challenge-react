@@ -81,6 +81,6 @@ The reasoning behind each choice is in [Step 4 decisions](../decisions/ADR-step4
 
 - The announcement was checked through the accessibility tree and automated tests, not with a real screen reader (VoiceOver or NVDA).
 - Treating "Payment not found." as a status message, rather than an alert, follows WCAG's "No results returned" example; WCAG doesn't name this exact case.
-- Until Step 5, a 500, 401 or network error still shows an empty table with no message.
+- Until Step 5, a 500, 401 or network error still shows an empty table with no message. (Fixed in [Step 5](step-5-handle-server-error.md).)
 - The real-browser check (axe in Chrome at 1280, 887, 640 and 320px: no violations; the box's edges match the input's) was a manual run, not part of the test suite.
 - The icon, border and narrower width go beyond the README screenshot, which shows a plain full-width box.

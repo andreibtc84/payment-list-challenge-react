@@ -16,9 +16,19 @@ export const fetchPayments = async (
   return data
 }
 
+const MESSAGE_BY_STATUS: Partial<Record<number, string>> = {
+  404: I18N.PAYMENT_NOT_FOUND,
+  500: I18N.INTERNAL_SERVER_ERROR,
+}
+
 // Keeps axios out of the UI: the page asks for a message and never inspects the HTTP error.
-// Step 4 maps only 404; other errors get no message yet.
-export const getErrorMessage = (error: unknown): string | undefined =>
-  isAxiosError(error) && error.response?.status === 404
-    ? I18N.PAYMENT_NOT_FOUND
-    : undefined
+export const getErrorMessage = (error: unknown): string | undefined => {
+  // TanStack Query reports "no error" as null.
+  if (error == null) return undefined
+  const message =
+    isAxiosError(error) && error.response
+      ? MESSAGE_BY_STATUS[error.response.status]
+      : undefined
+  // Any other failure (other status, network, non-HTTP) still gets a message, never a silent empty table.
+  return message ?? I18N.SOMETHING_WENT_WRONG
+}
